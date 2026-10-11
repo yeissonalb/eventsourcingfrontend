@@ -1,12 +1,22 @@
 import React from 'react';
+import {
+  DollarSign,
+  Layers,
+  CheckCircle2,
+  AlertTriangle,
+  AlertCircle,
+  Info,
+  ArrowRight,
+  Plus,
+  Inbox,
+} from 'lucide-react';
 
 export default function OverviewView({
   transactions,
   onSelectTransaction,
   onOpenCommandTerminal,
-  onOpenAudit,
 }) {
-  // Aggregate Financial metrics
+  // Financial metrics
   const totalCount = transactions.length;
   const completedCount = transactions.filter((t) => t.status === 'COMPLETED').length;
   const pendingCount = transactions.filter((t) => t.status === 'PAYMENT_PENDING' || t.status === 'CREATED').length;
@@ -30,29 +40,52 @@ export default function OverviewView({
     COMPLETED: completedCount,
   };
 
-  const statusColors = {
-    CREATED: '#38bdf8',
-    PAYMENT_PENDING: '#fbbf24',
-    PAYMENT_REJECTED: '#fb7185',
-    PAYMENT_APPROVED: '#34d399',
-    COMPLETED: '#4ade80',
+  const statusLabels = {
+    CREATED: '1. Creada (CREATED)',
+    PAYMENT_PENDING: '2. Cobro Pendiente (PAYMENT_PENDING)',
+    PAYMENT_REJECTED: '3. Rechazada por Banco (PAYMENT_REJECTED)',
+    PAYMENT_APPROVED: '4. Pago Aprobado (PAYMENT_APPROVED)',
+    COMPLETED: '5. Finalizada (COMPLETED)',
   };
 
   const recentTransactions = [...transactions].slice(0, 5);
 
   return (
     <div className="overview-container">
+      {/* Presentation Hero Banner - Perfect for defending the project */}
+      <div className="presentation-hero-banner">
+        <div className="hero-badge">Tema 4: Historial Auditable de Transacciones</div>
+        <h2>¿Qué problema resuelve este proyecto y qué es Event Sourcing?</h2>
+        <div className="hero-columns-explanation">
+          <div className="hero-explanation-item">
+            <div className="hero-item-header">
+              <AlertCircle size={16} className="text-destructive-icon" />
+              <span className="hero-item-title">El Problema Tradicional:</span>
+            </div>
+            <p>
+              Si solo guardamos una fila en una base de datos con estado "COMPLETED", nadie sabe qué pasó antes: si hubo rechazos del banco, cuántos reintentos ocurrieron o quién lo autorizó. Se pierde toda la historia.
+            </p>
+          </div>
+          <div className="hero-explanation-item">
+            <div className="hero-item-header">
+              <CheckCircle2 size={16} className="text-success-icon" />
+              <span className="hero-item-title">La Solución con Event Sourcing:</span>
+            </div>
+            <p>
+              Nunca sobreescribimos datos. Cada hecho relevante se guarda como un <strong>evento inmutable</strong> en el archivo append-only. El estado actual se calcula en tiempo real aplicando <code>replay(eventos)</code>.
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* KPI Cards Row */}
       <div className="overview-kpi-grid">
         {/* KPI 1: Volumen Financiero */}
-        <div className="kpi-card kpi-highlight">
+        <div className="kpi-card">
           <div className="kpi-top">
-            <span className="kpi-label">Volumen Acumulado en Store</span>
-            <div className="kpi-icon-pill icon-indigo">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <line x1="12" y1="1" x2="12" y2="23" />
-                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-              </svg>
+            <span className="kpi-label">Monto Total Procesado</span>
+            <div className="kpi-icon-pill">
+              <DollarSign size={16} />
             </div>
           </div>
           <div className="kpi-amount">
@@ -67,37 +100,31 @@ export default function OverviewView({
               ))
             )}
           </div>
-          <span className="kpi-footnote">Calculado sumando montos de transacciones activas</span>
+          <span className="kpi-footnote">Suma calculada desde los eventos del store</span>
         </div>
 
         {/* KPI 2: Total Transacciones */}
         <div className="kpi-card">
           <div className="kpi-top">
             <span className="kpi-label">Transacciones Registradas</span>
-            <div className="kpi-icon-pill icon-blue">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
-                <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
-              </svg>
+            <div className="kpi-icon-pill">
+              <Layers size={16} />
             </div>
           </div>
           <div className="kpi-metric-number">{totalCount}</div>
           <div className="kpi-split-stat">
-            <span className="text-success">{completedCount} finalizadas</span>
-            <span className="text-dim">·</span>
-            <span className="text-warning">{pendingCount} en proceso</span>
+            <span className="stat-highlight">{completedCount} finalizadas</span>
+            <span className="stat-separator">·</span>
+            <span className="stat-muted">{pendingCount} en proceso</span>
           </div>
         </div>
 
         {/* KPI 3: Tasa de Finalización */}
         <div className="kpi-card">
           <div className="kpi-top">
-            <span className="kpi-label">Tasa de Finalización Exitosa</span>
-            <div className="kpi-icon-pill icon-green">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                <polyline points="22 4 12 14.01 9 11.01" />
-              </svg>
+            <span className="kpi-label">Tasa de Finalización</span>
+            <div className="kpi-icon-pill">
+              <CheckCircle2 size={16} />
             </div>
           </div>
           <div className="kpi-metric-number">{successRate}%</div>
@@ -112,34 +139,30 @@ export default function OverviewView({
         {/* KPI 4: Control de Rechazos */}
         <div className="kpi-card">
           <div className="kpi-top">
-            <span className="kpi-label">Pagos Rechazados / Reintentos</span>
-            <div className="kpi-icon-pill icon-rose">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="10" />
-                <line x1="15" y1="9" x2="9" y2="15" />
-                <line x1="9" y1="9" x2="15" y2="15" />
-              </svg>
+            <span className="kpi-label">Rechazos Registrados</span>
+            <div className="kpi-icon-pill">
+              <AlertTriangle size={16} />
             </div>
           </div>
           <div className="kpi-metric-number">{rejectedCount}</div>
-          <span className="kpi-footnote">Disponibles para emisión de comando <code>PaymentRetried</code></span>
+          <span className="kpi-footnote">Registrados con motivo y listos para reintento</span>
         </div>
       </div>
 
       {/* Main Two Columns */}
       <div className="overview-split-grid">
-        {/* Left: State Distribution & Architecture summary */}
+        {/* Left: State Distribution */}
         <div className="admin-box-card">
           <div className="box-card-header">
             <div className="box-title-group">
-              <span className="box-badge">CQRS State Machine</span>
-              <h3>Distribución por Estados del Dominio</h3>
+              <span className="box-badge">Reconstrucción en Vivo</span>
+              <h3>Distribución de Estados Actuales</h3>
             </div>
           </div>
 
           <div className="box-card-content">
             <p className="box-description">
-              El estado actual de cada agregado se deriva únicamente mediante la función determinista <code>replay(events)</code> sobre el historial inmutable:
+              El sistema recorre el historial de eventos para deducir en qué estado se encuentra cada pago:
             </p>
 
             <div className="status-bars-container">
@@ -148,7 +171,7 @@ export default function OverviewView({
                 return (
                   <div key={status} className="status-bar-item">
                     <div className="status-bar-info">
-                      <span className={`status-pill status-${status}`}>{status}</span>
+                      <span className={`status-pill status-${status}`}>{statusLabels[status] || status}</span>
                       <span className="status-bar-count">
                         <strong>{count}</strong> ({percent}%)
                       </span>
@@ -156,10 +179,7 @@ export default function OverviewView({
                     <div className="bar-track">
                       <div
                         className="bar-fill"
-                        style={{
-                          width: `${percent}%`,
-                          backgroundColor: statusColors[status],
-                        }}
+                        style={{ width: `${percent}%` }}
                       />
                     </div>
                   </div>
@@ -168,44 +188,46 @@ export default function OverviewView({
             </div>
 
             <div className="event-sourcing-callout">
-              <div className="callout-icon">💡</div>
+              <div className="callout-icon">
+                <Info size={16} />
+              </div>
               <div className="callout-text">
-                <strong>Garantía de Inmutabilidad:</strong>
-                <span> El sistema nunca actualiza ni elimina registros existentes; cada transición es un evento cronológico nuevo append-only en <code>data/event-store.jsonl</code>.</span>
+                <strong>Punto clave para la defensa:</strong>
+                <span> Cada evento nuevo agrega una línea al archivo <code>data/event-store.jsonl</code>. No existen sentencias UPDATE ni DELETE.</span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Right: Recent Transactions Table & Quick Actions */}
+        {/* Right: Recent Transactions Table */}
         <div className="admin-box-card">
           <div className="box-card-header">
             <div className="box-title-group">
-              <span className="box-badge">Tiempo Real</span>
-              <h3>Actividad Reciente</h3>
+              <span className="box-badge">En Vivo</span>
+              <h3>Últimas Transacciones Registradas</h3>
             </div>
             <button
               type="button"
               className="btn-link-action"
               onClick={onOpenCommandTerminal}
             >
-              + Nuevo Comando
+              <Plus size={14} />
+              <span>Nuevo Pago</span>
             </button>
           </div>
 
           <div className="box-card-content p-0">
             {recentTransactions.length === 0 ? (
               <div className="empty-box-placeholder">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-                </svg>
-                <p>No hay transacciones en el Event Store</p>
+                <Inbox size={32} strokeWidth={1.5} className="empty-icon" />
+                <p>No hay transacciones registradas aún</p>
                 <button
                   type="button"
                   className="btn-primary-inline"
                   onClick={onOpenCommandTerminal}
                 >
-                  Crear la primera transacción
+                  <Plus size={14} />
+                  <span>Registrar primer pago</span>
                 </button>
               </div>
             ) : (
@@ -242,7 +264,8 @@ export default function OverviewView({
                           className="btn-table-drill"
                           onClick={() => onSelectTransaction(tx.transactionId)}
                         >
-                          Ver Detalle →
+                          <span>Ver Historia</span>
+                          <ArrowRight size={13} />
                         </button>
                       </td>
                     </tr>

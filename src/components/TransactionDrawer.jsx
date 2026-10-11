@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { X, CheckCircle2, XCircle, RotateCcw, CheckCheck, CreditCard } from 'lucide-react';
 import {
   getTransactionHistoryState,
   getTransactionHistoryEvents,
@@ -172,8 +173,8 @@ export default function TransactionDrawer({
             <span className="drawer-badge">Detalle de Agregado</span>
             <h3>{transactionId}</h3>
           </div>
-          <button type="button" className="btn-drawer-close" onClick={onClose}>
-            ×
+          <button type="button" className="btn-drawer-close" onClick={onClose} title="Cerrar panel">
+            <X size={16} />
           </button>
         </div>
 
@@ -283,7 +284,8 @@ export default function TransactionDrawer({
                     onClick={handleRequestPayment}
                     disabled={isSubmitting}
                   >
-                    Solicitar Cobro
+                    <CreditCard size={15} />
+                    <span>Solicitar Cobro</span>
                   </button>
                 </div>
               )}
@@ -320,7 +322,8 @@ export default function TransactionDrawer({
                       onClick={handleApprovePayment}
                       disabled={isSubmitting}
                     >
-                      Aprobar
+                      <CheckCircle2 size={15} />
+                      <span>Aprobar</span>
                     </button>
                     <button
                       type="button"
@@ -328,7 +331,8 @@ export default function TransactionDrawer({
                       onClick={handleRejectPayment}
                       disabled={isSubmitting}
                     >
-                      Rechazar
+                      <XCircle size={15} />
+                      <span>Rechazar</span>
                     </button>
                   </div>
                 </div>
@@ -344,7 +348,8 @@ export default function TransactionDrawer({
                     onClick={handleRetryPayment}
                     disabled={isSubmitting}
                   >
-                    Reintentar (Intento #{(txState.attemptCount || 0) + 1})
+                    <RotateCcw size={15} />
+                    <span>Reintentar (Intento #{(txState.attemptCount || 0) + 1})</span>
                   </button>
                 </div>
               )}
@@ -358,14 +363,15 @@ export default function TransactionDrawer({
                     onClick={handleCompleteTransaction}
                     disabled={isSubmitting}
                   >
-                    Cerrar Transacción (COMPLETED)
+                    <CheckCheck size={15} />
+                    <span>Cerrar Transacción (COMPLETED)</span>
                   </button>
                 </div>
               )}
 
               {txState.status === 'COMPLETED' && (
                 <div className="completed-state-card">
-                  <div className="completed-check-icon">✓</div>
+                  <CheckCheck size={28} className="text-emerald-600" />
                   <h4>Transacción Cerrada</h4>
                   <p>Estado terminal. Auditoría completada con éxito.</p>
                 </div>
