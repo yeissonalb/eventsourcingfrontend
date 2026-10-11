@@ -1,25 +1,22 @@
 import React, { useState, useMemo } from 'react';
+import { Download, ArrowRight, Plus, SearchX } from 'lucide-react';
 
 export default function TransactionsView({
   transactions,
   onSelectTransaction,
   searchQuery,
-  setSearchQuery,
   onOpenNewTransaction,
 }) {
   const [selectedStatus, setSelectedStatus] = useState('ALL');
   const [selectedCurrency, setSelectedCurrency] = useState('ALL');
-  const [sortBy, setSortBy] = useState('version-desc'); // 'amount-desc' | 'amount-asc' | 'version-desc' | 'id-asc'
+  const [sortBy, setSortBy] = useState('version-desc');
 
   // Filter and sort transactions
   const filteredAndSorted = useMemo(() => {
     return transactions
       .filter((tx) => {
-        // Status filter
         if (selectedStatus !== 'ALL' && tx.status !== selectedStatus) return false;
-        // Currency filter
         if (selectedCurrency !== 'ALL' && tx.currency !== selectedCurrency) return false;
-        // Search query
         if (searchQuery.trim()) {
           const q = searchQuery.toLowerCase().trim();
           const matchId = tx.transactionId.toLowerCase().includes(q);
@@ -40,11 +37,15 @@ export default function TransactionsView({
 
   // Export to JSON
   const handleExportJSON = () => {
-    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(filteredAndSorted, null, 2));
+    const blob = new Blob([JSON.stringify(filteredAndSorted, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
     const dlAnchorElem = document.createElement('a');
-    dlAnchorElem.setAttribute('href', dataStr);
+    dlAnchorElem.setAttribute('href', url);
     dlAnchorElem.setAttribute('download', `transacciones_export_${Date.now()}.json`);
+    document.body.appendChild(dlAnchorElem);
     dlAnchorElem.click();
+    document.body.removeChild(dlAnchorElem);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
   // Export to CSV
@@ -61,14 +62,16 @@ export default function TransactionsView({
       t.approvalCode || '',
       `"${(t.lastRejectionReason || '').replace(/"/g, '""')}"`,
     ]);
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
+    const csvContent = [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
+    link.setAttribute('href', url);
     link.setAttribute('download', `transacciones_audit_${Date.now()}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
   return (
@@ -78,14 +81,21 @@ export default function TransactionsView({
         <div className="controls-left">
           {/* Status Filter */}
           <div className="filter-pill-group">
-            {['ALL', 'CREATED', 'PAYMENT_PENDING', 'PAYMENT_REJECTED', 'PAYMENT_APPROVED', 'COMPLETED'].map((st) => (
+            {[
+              { id: 'ALL', label: 'Todos' },
+              { id: 'CREATED', label: 'Creadas' },
+              { id: 'PAYMENT_PENDING', label: 'Pendientes' },
+              { id: 'PAYMENT_REJECTED', label: 'Rechazadas' },
+              { id: 'PAYMENT_APPROVED', label: 'Aprobadas' },
+              { id: 'COMPLETED', label: 'Completadas' },
+            ].map((st) => (
               <button
-                key={st}
+                key={st.id}
                 type="button"
-                className={`control-pill ${selectedStatus === st ? 'active' : ''}`}
-                onClick={() => setSelectedStatus(st)}
+                className={`control-pill ${selectedStatus === st.id ? 'active' : ''}`}
+                onClick={() => setSelectedStatus(st.id)}
               >
-                {st === 'ALL' ? 'Todos los Estados' : st}
+                {st.label}
               </button>
             ))}
           </div>
@@ -110,7 +120,7 @@ export default function TransactionsView({
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
           >
-            <option value="version-desc">Mayor Versión (Recientes)</option>
+            <option value="version-desc">Más Recientes (Mayor Versión)</option>
             <option value="amount-desc">Mayor Monto</option>
             <option value="amount-asc">Menor Monto</option>
             <option value="id-asc">ID Alfabético</option>
@@ -124,7 +134,8 @@ export default function TransactionsView({
               onClick={handleExportCSV}
               title="Descargar reporte en formato CSV"
             >
-              CSV
+              <Download size={13} />
+              <span>CSV</span>
             </button>
             <button
               type="button"
@@ -132,7 +143,8 @@ export default function TransactionsView({
               onClick={handleExportJSON}
               title="Descargar datos en formato JSON"
             >
-              JSON
+              <Download size={13} />
+              <span>JSON</span>
             </button>
           </div>
         </div>
@@ -147,10 +159,10 @@ export default function TransactionsView({
               <th>Cliente</th>
               <th>Monto</th>
               <th>Estado Actual</th>
-              <th>Versión Log</th>
+              <th>Versión / Eventos</th>
               <th>Intentos</th>
-              <th>Detalles de Auditoría</th>
-              <th style={{ textAlign: 'right' }}>Operar</th>
+              <th>Detalle de Auditoría</th>
+              <th style={{ textAlign: 'right' }}>Acción</th>
             </tr>
           </thead>
           <tbody>
@@ -158,17 +170,15 @@ export default function TransactionsView({
               <tr>
                 <td colSpan="8">
                   <div className="table-empty-notice">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                      <circle cx="11" cy="11" r="8" />
-                      <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                    </svg>
+                    <SearchX size={32} strokeWidth={1.5} className="empty-icon" />
                     <p>No se encontraron transacciones con los filtros seleccionados.</p>
                     <button
                       type="button"
                       className="btn-primary-inline"
                       onClick={onOpenNewTransaction}
                     >
-                      + Registrar Nueva Transacción
+                      <Plus size={14} />
+                      <span>Registrar Nueva Transacción</span>
                     </button>
                   </div>
                 </td>
@@ -204,7 +214,7 @@ export default function TransactionsView({
                     </span>
                   </td>
                   <td>
-                    <span className="tag-version">v{tx.version}</span>
+                    <span className="tag-version">v{tx.version} ({tx.version} ev)</span>
                   </td>
                   <td>
                     <span className="tag-attempts">{tx.attemptCount || 0}</span>
@@ -212,12 +222,12 @@ export default function TransactionsView({
                   <td>
                     {tx.approvalCode && (
                       <span className="audit-detail-pill approved" title={`Código: ${tx.approvalCode}`}>
-                        Auth: {tx.approvalCode}
+                        Aprobado: {tx.approvalCode}
                       </span>
                     )}
                     {tx.lastRejectionReason && (
                       <span className="audit-detail-pill rejected" title={tx.lastRejectionReason}>
-                        Rechazo: {tx.lastRejectionReason}
+                        Motivo: {tx.lastRejectionReason}
                       </span>
                     )}
                     {!tx.approvalCode && !tx.lastRejectionReason && (
@@ -233,7 +243,8 @@ export default function TransactionsView({
                         onSelectTransaction(tx.transactionId);
                       }}
                     >
-                      Auditar / Operar →
+                      <span>Historial</span>
+                      <ArrowRight size={13} />
                     </button>
                   </td>
                 </tr>
@@ -244,8 +255,8 @@ export default function TransactionsView({
 
         {/* Table Footer info */}
         <div className="table-footer-bar">
-          <span>Mostrando <strong>{filteredAndSorted.length}</strong> de <strong>{transactions.length}</strong> transacciones</span>
-          <span>Arquitectura: <em>Event Sourcing & CQRS Inmutable</em></span>
+          <span>Mostrando <strong>{filteredAndSorted.length}</strong> de <strong>{transactions.length}</strong> pagos</span>
+          <span>Técnica: <em>Event Sourcing (Reconstrucción en vivo)</em></span>
         </div>
       </div>
     </div>

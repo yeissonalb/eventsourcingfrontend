@@ -1,5 +1,18 @@
 import React, { useState } from 'react';
 import {
+  PlusCircle,
+  ArrowRightLeft,
+  Play,
+  CheckCircle2,
+  XCircle,
+  RotateCcw,
+  Sparkles,
+  Terminal,
+  Trash2,
+  CreditCard,
+  CheckCheck,
+} from 'lucide-react';
+import {
   createTransaction,
   requestPayment,
   rejectPayment,
@@ -21,15 +34,15 @@ export default function CommandTerminalView({
   // New Transaction State
   const [amount, setAmount] = useState('15000');
   const [currency, setCurrency] = useState('CRC');
-  const [customerId, setCustomerId] = useState('cliente-alpha');
+  const [customerId, setCustomerId] = useState('cliente-demo');
   const [customTxId, setCustomTxId] = useState('');
 
   // Transition State
   const [paymentAmount, setPaymentAmount] = useState('');
   const [approvalCode, setApprovalCode] = useState('');
   const [rejectionReason, setRejectionReason] = useState('Fondos insuficientes en la cuenta');
-  const [customExpectedVersion, setCustomExpectedVersion] = useState('');
-  const [overrideVersion, setOverrideVersion] = useState(false);
+  const [customExpectedVersion] = useState('');
+  const [overrideVersion] = useState(false);
 
   // Loading & Execution Log State
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -50,13 +63,13 @@ export default function CommandTerminalView({
     if (presetName === 'retail') {
       setAmount('12500');
       setCurrency('CRC');
-      setCustomerId('cliente-tienda-01');
+      setCustomerId('cliente-tienda-cr');
     } else if (presetName === 'corporate') {
-      setAmount('2500');
+      setAmount('3500');
       setCurrency('USD');
       setCustomerId('empresa-corporativa');
     } else if (presetName === 'micro') {
-      setAmount('500');
+      setAmount('1000');
       setCurrency('CRC');
       setCustomerId('usuario-app-movil');
     }
@@ -76,7 +89,7 @@ export default function CommandTerminalView({
       return;
     }
     if (!customerId.trim()) {
-      showNotification('error', 'El Customer ID no puede estar vacío');
+      showNotification('error', 'El identificador del cliente no puede estar vacío');
       return;
     }
 
@@ -89,14 +102,14 @@ export default function CommandTerminalView({
         transactionId: customTxId.trim() || undefined,
       });
 
-      addConsoleLog('POST /transactions (TransactionCreated)', 'SUCCESS', `Agregado v1 creado con ID: ${res.transactionId}`);
-      showNotification('success', `Comando TransactionCreated ejecutado exitosamente (v1)`);
+      addConsoleLog('Evento Guardado: TransactionCreated (Paso 1)', 'EXITO', `Transacción iniciada con ID: ${res.transactionId}`);
+      showNotification('success', `Evento TransactionCreated guardado en el archivo (v1)`);
       setCustomTxId('');
       await onTransactionUpdated(res.transactionId);
       setActiveMode('transition');
     } catch (err) {
-      addConsoleLog('POST /transactions', 'ERROR', err.message);
-      showNotification('error', `Error al crear transacción: ${err.message}`);
+      addConsoleLog('Error al Crear', 'ERROR', err.message);
+      showNotification('error', `Error al registrar transacción: ${err.message}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -119,7 +132,7 @@ export default function CommandTerminalView({
           amount: amt,
           expectedVersion: versionToUse,
         });
-        addConsoleLog(`POST /transactions/${selectedTx.transactionId}/request-payment`, 'SUCCESS', `PaymentRequested registrado (v${res.version})`);
+        addConsoleLog(`Evento Guardado: PaymentRequested (v${res.version})`, 'EXITO', `Cobro solicitado por ${amt} ${selectedTx.currency}`);
         showNotification('success', `Evento PaymentRequested registrado (v${res.version})`);
       } else if (actionType === 'APPROVE_PAYMENT') {
         const code = approvalCode.trim() || `AUTH-${Math.floor(100000 + Math.random() * 900000)}`;
@@ -127,7 +140,7 @@ export default function CommandTerminalView({
           approvalCode: code,
           expectedVersion: versionToUse,
         });
-        addConsoleLog(`POST /transactions/${selectedTx.transactionId}/approve-payment`, 'SUCCESS', `PaymentApproved registrado (v${res.version}) con código ${code}`);
+        addConsoleLog(`Evento Guardado: PaymentApproved (v${res.version})`, 'EXITO', `Pago aprobado con código ${code}`);
         showNotification('success', `Evento PaymentApproved registrado (v${res.version})`);
         setApprovalCode('');
       } else if (actionType === 'REJECT_PAYMENT') {
@@ -140,7 +153,7 @@ export default function CommandTerminalView({
           reason: rejectionReason.trim(),
           expectedVersion: versionToUse,
         });
-        addConsoleLog(`POST /transactions/${selectedTx.transactionId}/reject-payment`, 'SUCCESS', `PaymentRejected registrado (v${res.version}). Motivo: ${rejectionReason}`);
+        addConsoleLog(`Evento Guardado: PaymentRejected (v${res.version})`, 'EXITO', `Rechazo bancario: ${rejectionReason}`);
         showNotification('success', `Evento PaymentRejected registrado (v${res.version})`);
       } else if (actionType === 'RETRY_PAYMENT') {
         const nextAttempt = (selectedTx.attemptCount || 0) + 1;
@@ -148,21 +161,21 @@ export default function CommandTerminalView({
           attemptNumber: nextAttempt,
           expectedVersion: versionToUse,
         });
-        addConsoleLog(`POST /transactions/${selectedTx.transactionId}/retry-payment`, 'SUCCESS', `PaymentRetried registrado (v${res.version}). Intento #${nextAttempt}`);
+        addConsoleLog(`Evento Guardado: PaymentRetried (v${res.version})`, 'EXITO', `Reintento automático #${nextAttempt}`);
         showNotification('success', `Evento PaymentRetried registrado (v${res.version})`);
       } else if (actionType === 'COMPLETE_TRANSACTION') {
         res = await completeTransaction(selectedTx.transactionId, {
           completedAt: new Date().toISOString(),
           expectedVersion: versionToUse,
         });
-        addConsoleLog(`POST /transactions/${selectedTx.transactionId}/complete`, 'SUCCESS', `TransactionCompleted registrado (v${res.version}). Transacción cerrada.`);
+        addConsoleLog(`Evento Guardado: TransactionCompleted (v${res.version})`, 'EXITO', `Transacción finalizada con éxito`);
         showNotification('success', `Evento TransactionCompleted registrado (v${res.version})`);
       }
 
       await onTransactionUpdated(selectedTx.transactionId);
     } catch (err) {
-      addConsoleLog(`COMMAND ERROR (${actionType})`, 'ERROR', err.message);
-      showNotification('error', `Violación de regla o error: ${err.message}`);
+      addConsoleLog(`Regla de Negocio no permitida (${actionType})`, 'ERROR', err.message);
+      showNotification('error', `Aviso: ${err.message}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -177,21 +190,16 @@ export default function CommandTerminalView({
           className={`terminal-nav-tab ${activeMode === 'create' ? 'active' : ''}`}
           onClick={() => setActiveMode('create')}
         >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <line x1="12" y1="5" x2="12" y2="19" />
-            <line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
-          1. Crear Nueva Transacción (TransactionCreated)
+          <PlusCircle size={15} />
+          <span>1. Iniciar Nuevo Pago (TransactionCreated)</span>
         </button>
         <button
           type="button"
           className={`terminal-nav-tab ${activeMode === 'transition' ? 'active' : ''}`}
           onClick={() => setActiveMode('transition')}
         >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <polyline points="9 18 15 12 9 6" />
-          </svg>
-          2. Despachar Comandos de Ciclo de Vida (State Transitions)
+          <ArrowRightLeft size={15} />
+          <span>2. Continuar el Proceso (Aprobar, Rechazar o Reintentar)</span>
         </button>
       </div>
 
@@ -201,22 +209,22 @@ export default function CommandTerminalView({
           {activeMode === 'create' ? (
             <div className="command-form-body">
               <div className="form-legend-header">
-                <h3>Registro de Transacción (Versión 1)</h3>
-                <p>Escribe el evento append-only <code>TransactionCreated</code> en el Command Service (:3000).</p>
+                <h3>Paso 1: Iniciar la Transacción</h3>
+                <p>Escribe el primer evento (<code>TransactionCreated</code>) en el archivo inmutable.</p>
               </div>
 
               {/* Presets */}
               <div className="presets-bar">
-                <span className="presets-label">Plantillas Rápidas:</span>
-                <button type="button" className="btn-preset" onClick={() => applyPreset('retail')}>Retail CRC</button>
-                <button type="button" className="btn-preset" onClick={() => applyPreset('corporate')}>Corporativo USD</button>
-                <button type="button" className="btn-preset" onClick={() => applyPreset('micro')}>Micro CRC</button>
+                <span className="presets-label">Datos rápidos:</span>
+                <button type="button" className="btn-preset" onClick={() => applyPreset('retail')}>Compras Retail CRC</button>
+                <button type="button" className="btn-preset" onClick={() => applyPreset('corporate')}>Pago Corporativo USD</button>
+                <button type="button" className="btn-preset" onClick={() => applyPreset('micro')}>Pago Móvil CRC</button>
               </div>
 
               <form onSubmit={handleCreate} className="form-vertical">
                 <div className="form-grid-2">
                   <div className="form-field">
-                    <label htmlFor="termAmount">Monto de la Transacción *</label>
+                    <label htmlFor="termAmount">Monto a pagar *</label>
                     <input
                       id="termAmount"
                       type="number"
@@ -229,35 +237,35 @@ export default function CommandTerminalView({
                     />
                   </div>
                   <div className="form-field">
-                    <label htmlFor="termCurrency">Moneda (ISO 4217) *</label>
+                    <label htmlFor="termCurrency">Moneda *</label>
                     <select
                       id="termCurrency"
-                      className="input-control"
+                      className="select-custom"
                       value={currency}
                       onChange={(e) => setCurrency(e.target.value)}
                     >
-                      <option value="CRC">CRC - Colón Costarricense</option>
-                      <option value="USD">USD - Dólar Estadounidense</option>
-                      <option value="EUR">EUR - Euro</option>
+                      <option value="CRC">CRC - Colones Costarricenses</option>
+                      <option value="USD">USD - Dólares Estadounidenses</option>
+                      <option value="EUR">EUR - Euros</option>
                     </select>
                   </div>
                 </div>
 
                 <div className="form-field">
-                  <label htmlFor="termCustomerId">Identificador del Cliente (customerId) *</label>
+                  <label htmlFor="termCustomerId">Nombre o ID del Cliente *</label>
                   <input
                     id="termCustomerId"
                     type="text"
-                    className="input-control font-mono"
+                    className="input-control"
                     value={customerId}
                     onChange={(e) => setCustomerId(e.target.value)}
-                    placeholder="cliente-456"
+                    placeholder="Ej. cliente-ana"
                     required
                   />
                 </div>
 
                 <div className="form-field">
-                  <label htmlFor="termCustomId">ID de Transacción Personalizado (UUID opcional)</label>
+                  <label htmlFor="termCustomId">ID de Transacción (Opcional)</label>
                   <div className="input-group-btn">
                     <input
                       id="termCustomId"
@@ -265,7 +273,7 @@ export default function CommandTerminalView({
                       className="input-control font-mono"
                       value={customTxId}
                       onChange={(e) => setCustomTxId(e.target.value)}
-                      placeholder="Autogenerar UUID si se deja vacío..."
+                      placeholder="Se genera automáticamente si se deja en blanco"
                     />
                     <button
                       type="button"
@@ -282,10 +290,8 @@ export default function CommandTerminalView({
                   className="btn-command-execute"
                   disabled={isSubmitting || !commandHealth.online}
                 >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                    <polygon points="5 3 19 12 5 21 5 3" />
-                  </svg>
-                  {isSubmitting ? 'Registrando en Event Store...' : 'Emitir Comando POST /transactions'}
+                  <Play size={15} fill="currentColor" />
+                  <span>{isSubmitting ? 'Guardando evento...' : 'Guardar Evento: TransactionCreated (v1)'}</span>
                 </button>
               </form>
             </div>
@@ -293,16 +299,16 @@ export default function CommandTerminalView({
             /* Mode Transition Form */
             <div className="command-form-body">
               <div className="form-legend-header">
-                <h3>Operaciones de Ciclo de Vida</h3>
-                <p>Aplica comandos según el estado y valida el bloqueo optimista de versiones.</p>
+                <h3>Avanzar el Ciclo de Vida del Pago</h3>
+                <p>Las reglas de Event Sourcing impiden saltarse pasos (ej. no se puede completar sin aprobar primero).</p>
               </div>
 
               {/* Transaction Picker */}
               <div className="form-field">
-                <label htmlFor="termSelectTx">Seleccionar Transacción a Operar:</label>
+                <label htmlFor="termSelectTx">Seleccionar pago a continuar:</label>
                 <select
                   id="termSelectTx"
-                  className="input-control font-mono"
+                  className="select-custom font-mono"
                   value={selectedTx?.transactionId || ''}
                   onChange={(e) => setSelectedTxId(e.target.value)}
                 >
@@ -321,7 +327,7 @@ export default function CommandTerminalView({
                       <span className={`status-pill status-${selectedTx.status}`}>
                         {selectedTx.status}
                       </span>
-                      <span className="tag-version">Versión actual: v{selectedTx.version}</span>
+                      <span className="tag-version">Eventos: {selectedTx.version}</span>
                     </div>
                     <div className="summary-right">
                       <strong>{selectedTx.amount.toLocaleString()} {selectedTx.currency}</strong>
@@ -329,44 +335,15 @@ export default function CommandTerminalView({
                     </div>
                   </div>
 
-                  {/* Optimistic Concurrency Controls */}
-                  <div className="concurrency-section">
-                    <div className="concurrency-header">
-                      <span className="concurrency-title">Control de Concurrencia Optimista (expectedVersion)</span>
-                      <label className="checkbox-label">
-                        <input
-                          type="checkbox"
-                          checked={overrideVersion}
-                          onChange={(e) => setOverrideVersion(e.target.checked)}
-                        />
-                        Simular conflicto de versión (Testing 409)
-                      </label>
-                    </div>
-                    {overrideVersion && (
-                      <div className="override-input-box">
-                        <label htmlFor="customVersionInput">expectedVersion manual:</label>
-                        <input
-                          id="customVersionInput"
-                          type="number"
-                          className="input-control font-mono"
-                          value={customExpectedVersion}
-                          onChange={(e) => setCustomExpectedVersion(e.target.value)}
-                          placeholder={`Versión actual es ${selectedTx.version}`}
-                        />
-                        <span className="text-xs text-dim">
-                          Envía un número diferente a {selectedTx.version} para verificar el rechazo HTTP 409 Conflict.
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
                   {/* Contextual Action Forms */}
                   {selectedTx.status === 'CREATED' && (
                     <div className="command-action-box">
-                      <h4>Comando: Solicitar Cobro (PaymentRequested)</h4>
-                      <p className="text-xs text-muted">Avanza el estado de CREATED a PAYMENT_PENDING.</p>
+                      <h4>Paso 2: Solicitar el Cobro al Banco (PaymentRequested)</h4>
+                      <p className="text-xs text-muted">
+                        Registra que se envió la solicitud de cobro. El monto debe ser el mismo de la transacción original.
+                      </p>
                       <div className="form-field">
-                        <label htmlFor="termReqAmount">Monto a cobrar (debe coincidir con la transacción):</label>
+                        <label htmlFor="termReqAmount">Monto a cobrar ({selectedTx.currency}):</label>
                         <input
                           id="termReqAmount"
                           type="number"
@@ -381,16 +358,20 @@ export default function CommandTerminalView({
                         onClick={() => handleExecuteTransition('REQUEST_PAYMENT')}
                         disabled={isSubmitting}
                       >
-                        Despachar PaymentRequested
+                        <CreditCard size={15} />
+                        <span>Emitir Evento: PaymentRequested</span>
                       </button>
                     </div>
                   )}
 
                   {selectedTx.status === 'PAYMENT_PENDING' && (
                     <div className="command-action-box">
-                      <h4>Resolución de Pago Pendiente</h4>
+                      <h4>Paso 3: Respuesta del Banco (Aprobación o Rechazo)</h4>
+                      <p className="text-xs text-muted">
+                        Simula lo que responde el procesador bancario. Puedes aprobar con código o rechazar con motivo.
+                      </p>
                       <div className="form-field">
-                        <label htmlFor="termApprovalCode">Código de Autorización (para Aprobar):</label>
+                        <label htmlFor="termApprovalCode">Código de Autorización (si se aprueba):</label>
                         <div className="input-group-btn">
                           <input
                             id="termApprovalCode"
@@ -405,13 +386,14 @@ export default function CommandTerminalView({
                             className="btn-action-outline"
                             onClick={() => setApprovalCode(`AUTH-${Math.floor(100000 + Math.random() * 900000)}`)}
                           >
-                            Generar Auth
+                            <Sparkles size={13} />
+                            <span>Generar Código</span>
                           </button>
                         </div>
                       </div>
 
                       <div className="form-field">
-                        <label htmlFor="termRejectionReason">Motivo de Rechazo (para Rechazar):</label>
+                        <label htmlFor="termRejectionReason">Motivo de Rechazo (si no pasa el pago):</label>
                         <input
                           id="termRejectionReason"
                           type="text"
@@ -429,7 +411,8 @@ export default function CommandTerminalView({
                           onClick={() => handleExecuteTransition('APPROVE_PAYMENT')}
                           disabled={isSubmitting}
                         >
-                          ✓ Aprobar Pago (PaymentApproved)
+                          <CheckCircle2 size={15} />
+                          <span>Aprobar Pago (PaymentApproved)</span>
                         </button>
                         <button
                           type="button"
@@ -437,7 +420,8 @@ export default function CommandTerminalView({
                           onClick={() => handleExecuteTransition('REJECT_PAYMENT')}
                           disabled={isSubmitting}
                         >
-                          ✕ Rechazar Pago (PaymentRejected)
+                          <XCircle size={15} />
+                          <span>Rechazar Pago (PaymentRejected)</span>
                         </button>
                       </div>
                     </div>
@@ -445,13 +429,13 @@ export default function CommandTerminalView({
 
                   {selectedTx.status === 'PAYMENT_REJECTED' && (
                     <div className="command-action-box">
-                      <h4>Reintento de Pago (PaymentRetried)</h4>
+                      <h4>Paso 4: Reintentar el Pago (PaymentRetried)</h4>
                       <div className="rejection-notice-box">
-                        <strong>Motivo del rechazo anterior:</strong>
+                        <strong>Motivo del rechazo registrado:</strong>
                         <p>{selectedTx.lastRejectionReason || 'No especificado'}</p>
                       </div>
                       <p className="text-xs text-muted">
-                        El backend calculará de manera auditable el intento #{(selectedTx.attemptCount || 0) + 1}.
+                        Al reintentar, el sistema incrementa automáticamente el contador al intento #{(selectedTx.attemptCount || 0) + 1}.
                       </p>
                       <button
                         type="button"
@@ -459,16 +443,17 @@ export default function CommandTerminalView({
                         onClick={() => handleExecuteTransition('RETRY_PAYMENT')}
                         disabled={isSubmitting}
                       >
-                        ↻ Registrar Reintento (Intento #{(selectedTx.attemptCount || 0) + 1})
+                        <RotateCcw size={15} />
+                        <span>Reintentar Cobro (Intento #{(selectedTx.attemptCount || 0) + 1})</span>
                       </button>
                     </div>
                   )}
 
                   {selectedTx.status === 'PAYMENT_APPROVED' && (
                     <div className="command-action-box">
-                      <h4>Cierre de Transacción (TransactionCompleted)</h4>
-                      <p className="text-xs text-success">
-                        El pago fue aprobado exitosamente con código <strong>{selectedTx.approvalCode}</strong>.
+                      <h4>Paso 5: Finalizar Operación (TransactionCompleted)</h4>
+                      <p className="text-xs text-success font-semibold">
+                        El pago fue aprobado exitosamente con código: <strong>{selectedTx.approvalCode}</strong>.
                       </p>
                       <button
                         type="button"
@@ -476,54 +461,52 @@ export default function CommandTerminalView({
                         onClick={() => handleExecuteTransition('COMPLETE_TRANSACTION')}
                         disabled={isSubmitting}
                       >
-                        ✓ Cerrar Transacción (COMPLETED)
+                        <CheckCheck size={15} />
+                        <span>Cerrar Transacción (TransactionCompleted)</span>
                       </button>
                     </div>
                   )}
 
                   {selectedTx.status === 'COMPLETED' && (
                     <div className="completed-state-card">
-                      <div className="completed-check-icon">✓</div>
-                      <h4>Transacción en Estado Terminal</h4>
-                      <p>El ciclo de vida ha concluido con éxito. Ningún otro evento puede anexarse a este agregado.</p>
+                      <CheckCheck size={28} className="text-emerald-600" />
+                      <h4>Transacción Finalizada con Éxito</h4>
+                      <p>Ha completado todo su ciclo auditable. No admite más eventos porque es un estado terminal.</p>
                     </div>
                   )}
                 </div>
               ) : (
                 <div className="empty-selection-placeholder">
-                  No hay transacciones disponibles para operar. Crea una nueva primero.
+                  No hay transacciones registradas. Crea una primero con el botón superior.
                 </div>
               )}
             </div>
           )}
         </div>
 
-        {/* Right Console Output Terminal */}
+        {/* Right Output Terminal */}
         <div className="terminal-console-card">
           <div className="console-header">
             <div className="console-title-group">
-              <span className="console-dot-group">
-                <span className="dot dot-red" />
-                <span className="dot dot-yellow" />
-                <span className="dot dot-green" />
-              </span>
-              <span className="console-title">Live CQRS Command Execution Console</span>
+              <Terminal size={15} className="text-zinc-600" />
+              <span className="console-title">Bitácora de Eventos Guardados</span>
             </div>
             <button
               type="button"
               className="btn-clear-console"
               onClick={() => setConsoleLogs([])}
             >
-              Limpiar
+              <Trash2 size={13} />
+              <span>Limpiar</span>
             </button>
           </div>
 
           <div className="console-body">
             {consoleLogs.length === 0 ? (
               <div className="console-idle">
-                <p>&gt; Esperando emisión de comandos CQRS...</p>
-                <p>&gt; Los comandos son enviados a <strong>http://localhost:3000</strong></p>
-                <p>&gt; Las reglas de dominio validan inmutabilidad y orden estricto de eventos.</p>
+                <p>&gt; Esperando acciones...</p>
+                <p>&gt; Cada vez que ejecutas un paso, el <strong>Servicio de Escritura (Puerto 3000)</strong> agrega un evento inmutable a <code>data/event-store.jsonl</code>.</p>
+                <p>&gt; Este panel te ayuda a ver qué evento se emitió para explicárselo al profesor.</p>
               </div>
             ) : (
               consoleLogs.map((log, index) => (

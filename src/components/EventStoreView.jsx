@@ -1,4 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import {
+  RefreshCw,
+  GitCommit,
+  Code2,
+  Download,
+  Copy,
+  ChevronDown,
+  ChevronUp,
+  Inbox,
+  Check,
+} from 'lucide-react';
 import { getTransactionHistoryEvents, getTransactionHistoryState } from '../api';
 
 export default function EventStoreView({
@@ -13,6 +24,7 @@ export default function EventStoreView({
   const [expandedEvents, setExpandedEvents] = useState({});
   const [viewFormat, setViewFormat] = useState('timeline'); // 'timeline' | 'raw'
   const [exportFormat, setExportFormat] = useState('json'); // 'json' | 'csv'
+  const [copiedId, setCopiedId] = useState(null);
 
   const currentTx = transactions.find((t) => t.transactionId === selectedTxId) || transactions[0] || null;
 
@@ -67,8 +79,12 @@ export default function EventStoreView({
   };
 
   // Copy to clipboard helper
-  const copyToClipboard = (text, label) => {
+  const copyToClipboard = (text, label, idKey = null) => {
     navigator.clipboard.writeText(text);
+    if (idKey) {
+      setCopiedId(idKey);
+      setTimeout(() => setCopiedId(null), 2000);
+    }
     showNotification('success', `${label} copiado al portapapeles`);
   };
 
@@ -164,9 +180,7 @@ export default function EventStoreView({
             onClick={() => currentTx && loadData(currentTx.transactionId)}
             title="Recargar eventos del event store"
           >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14">
-              <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
-            </svg>
+            <RefreshCw size={14} className={isLoading ? 'icon-spin' : ''} />
           </button>
         </div>
 
@@ -180,10 +194,7 @@ export default function EventStoreView({
               onClick={() => setViewFormat('timeline')}
               id="btn-view-timeline"
             >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="15" height="15">
-                <circle cx="12" cy="12" r="10" />
-                <polyline points="12 6 12 12 16 14" />
-              </svg>
+              <GitCommit size={14} />
               <span>Línea de Tiempo</span>
               <span className="count-pill">{events.length}</span>
             </button>
@@ -194,10 +205,7 @@ export default function EventStoreView({
               onClick={() => setViewFormat('raw')}
               id="btn-view-raw-json"
             >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="15" height="15">
-                <polyline points="16 18 22 12 16 6" />
-                <polyline points="8 6 2 12 8 18" />
-              </svg>
+              <Code2 size={14} />
               <span>JSON Raw Log</span>
             </button>
           </div>
@@ -222,11 +230,7 @@ export default function EventStoreView({
               id="btn-export-audit"
               title="Descargar archivo de auditoría inmutable"
             >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" width="15" height="15">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                <polyline points="7 10 12 15 17 10" />
-                <line x1="12" y1="15" x2="12" y2="3" />
-              </svg>
+              <Download size={14} />
               <span>Exportar Auditoría ({exportFormat.toUpperCase()})</span>
             </button>
           </div>
@@ -294,7 +298,7 @@ export default function EventStoreView({
               <div className="audit-concept-box">
                 <h4>Invariantes de Auditoría</h4>
                 <p>
-                  El estado superior no se almacena en base de datos. Se reconstruye en tiempo de ejecución recorriendo los {events.length} eventos inmutables del log.
+                  El estado superior no se almacena en una tabla fija. Se reconstruye en tiempo de ejecución recorriendo los {events.length} eventos inmutables del log.
                 </p>
               </div>
             </div>
@@ -342,7 +346,8 @@ export default function EventStoreView({
                   className="btn-action-outline-sm"
                   onClick={() => copyToClipboard(JSON.stringify(events, null, 2), 'JSON Completo')}
                 >
-                  Copiar Todo el JSON
+                  <Copy size={13} />
+                  <span>Copiar Todo el JSON</span>
                 </button>
               </div>
             )}
@@ -350,16 +355,12 @@ export default function EventStoreView({
 
           {isLoading ? (
             <div className="loading-events-notice">
-              <div className="spinner-icon" />
+              <RefreshCw size={20} className="icon-spin text-zinc-500" />
               <span>Consultando y reconstruyendo eventos del Event Store...</span>
             </div>
           ) : events.length === 0 ? (
             <div className="empty-events-notice">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="36" height="36">
-                <circle cx="12" cy="12" r="10" />
-                <line x1="12" y1="8" x2="12" y2="12" />
-                <line x1="12" y1="16" x2="12.01" y2="16" />
-              </svg>
+              <Inbox size={32} strokeWidth={1.5} className="empty-icon" />
               <p>No se encontraron eventos registrados para esta transacción.</p>
             </div>
           ) : viewFormat === 'timeline' ? (
@@ -388,17 +389,32 @@ export default function EventStoreView({
                           <button
                             type="button"
                             className="btn-tiny-copy"
-                            onClick={() => copyToClipboard(JSON.stringify(evt.data, null, 2), `Payload v${evt.version}`)}
+                            onClick={() => copyToClipboard(JSON.stringify(evt.data, null, 2), `Payload v${evt.version}`, `payload-${evt.version}`)}
                             title="Copiar JSON del payload"
                           >
-                            Copiar Payload
+                            {copiedId === `payload-${evt.version}` ? (
+                              <Check size={12} className="text-emerald-600" />
+                            ) : (
+                              <Copy size={12} />
+                            )}
+                            <span>Copiar Payload</span>
                           </button>
                           <button
                             type="button"
                             className="btn-tiny-toggle"
                             onClick={() => toggleExpand(evt.version)}
                           >
-                            {isExpanded ? 'Ocultar' : 'Ver Payload'}
+                            {isExpanded ? (
+                              <>
+                                <ChevronUp size={12} />
+                                <span>Ocultar</span>
+                              </>
+                            ) : (
+                              <>
+                                <ChevronDown size={12} />
+                                <span>Ver Payload</span>
+                              </>
+                            )}
                           </button>
                         </div>
                       </div>

@@ -1,5 +1,13 @@
 import React, { useState } from 'react';
 import {
+  Sparkles,
+  ArrowRight,
+  Terminal,
+  Database,
+  ExternalLink,
+  CheckCircle2,
+} from 'lucide-react';
+import {
   COMMAND_API_BASE,
   HISTORY_API_BASE,
   createTransaction,
@@ -13,22 +21,23 @@ import {
 export default function SystemView({
   commandHealth,
   historyHealth,
-  onRefresh,
   showNotification,
   refreshTransactions,
 }) {
   const [isSeeding, setIsSeeding] = useState(false);
+  const [simulationStep, setSimulationStep] = useState(null);
 
-  // Generate automated full lifecycle demo transaction
+  // Generate automated full lifecycle demo transaction (The 6 required events)
   const handleRunFullCycleDemo = async () => {
     setIsSeeding(true);
-    showNotification('success', 'Iniciando simulación de ciclo completo Event Sourcing...');
+    showNotification('success', 'Iniciando demostración en vivo de los 6 eventos...');
 
     try {
-      const demoCust = `demo-user-${Math.floor(100 + Math.random() * 900)}`;
-      const demoAmount = 18500;
+      const demoCust = `cliente-exposicion-${Math.floor(100 + Math.random() * 900)}`;
+      const demoAmount = 25000;
 
-      // 1. TransactionCreated (v1)
+      // Paso 1: TransactionCreated (v1)
+      setSimulationStep('1/6: Registrando TransactionCreated (v1)...');
       const step1 = await createTransaction({
         amount: demoAmount,
         currency: 'CRC',
@@ -36,84 +45,133 @@ export default function SystemView({
       });
       const txId = step1.transactionId;
 
-      // 2. PaymentRequested (v2)
-      await new Promise((r) => setTimeout(r, 400));
+      // Paso 2: PaymentRequested (v2)
+      await new Promise((r) => setTimeout(r, 600));
+      setSimulationStep('2/6: Registrando PaymentRequested (v2)...');
       await requestPayment(txId, {
         amount: demoAmount,
         expectedVersion: 1,
       });
 
-      // 3. PaymentRejected (v3)
-      await new Promise((r) => setTimeout(r, 400));
+      // Paso 3: PaymentRejected (v3)
+      await new Promise((r) => setTimeout(r, 600));
+      setSimulationStep('3/6: Simulando rechazo del banco: PaymentRejected (v3)...');
       await rejectPayment(txId, {
-        reason: 'Fondos temporalmente retenidos por el emisor',
+        reason: 'Fondos insuficientes en la cuenta bancaria',
         expectedVersion: 2,
       });
 
-      // 4. PaymentRetried (v4)
-      await new Promise((r) => setTimeout(r, 400));
+      // Paso 4: PaymentRetried (v4)
+      await new Promise((r) => setTimeout(r, 600));
+      setSimulationStep('4/6: Reintentando cobro automático: PaymentRetried (v4)...');
       await retryPayment(txId, {
         attemptNumber: 2,
         expectedVersion: 3,
       });
 
-      // 5. PaymentApproved (v5)
-      await new Promise((r) => setTimeout(r, 400));
+      // Paso 5: PaymentApproved (v5)
+      await new Promise((r) => setTimeout(r, 600));
+      setSimulationStep('5/6: Banco aprueba el pago: PaymentApproved (v5)...');
       await approvePayment(txId, {
-        approvalCode: `AUTH-DEMO-${Math.floor(1000 + Math.random() * 9000)}`,
+        approvalCode: `AUTH-EXPO-${Math.floor(1000 + Math.random() * 9000)}`,
         expectedVersion: 4,
       });
 
-      // 6. TransactionCompleted (v6)
-      await new Promise((r) => setTimeout(r, 400));
+      // Paso 6: TransactionCompleted (v6)
+      await new Promise((r) => setTimeout(r, 600));
+      setSimulationStep('6/6: Cerrando la operación: TransactionCompleted (v6)...');
       await completeTransaction(txId, {
         completedAt: new Date().toISOString(),
         expectedVersion: 5,
       });
 
+      setSimulationStep('¡Completado con éxito!');
       await refreshTransactions(txId);
-      showNotification('success', `¡Simulación exitosa! Se generaron 6 eventos inmutables para ${txId}`);
+      showNotification('success', `¡Demostración lista! Se guardaron los 6 eventos de la transacción ${txId}`);
     } catch (err) {
-      showNotification('error', `Error en simulación: ${err.message}`);
+      showNotification('error', `Aviso en simulación: ${err.message}`);
     } finally {
       setIsSeeding(false);
+      setTimeout(() => setSimulationStep(null), 4000);
     }
   };
 
   return (
     <div className="system-view-container">
-      {/* Top Cards: Architecture Services */}
-      <div className="system-nodes-grid">
+      {/* Demo Seeder Hero Box */}
+      <div className="admin-box-card highlight-card">
+        <div className="box-card-header">
+          <div className="box-title-group">
+            <span className="box-badge">Herramienta para la Exposición</span>
+            <h3>Demostración Automática de los 6 Eventos Requeridos</h3>
+          </div>
+        </div>
+
+        <div className="box-card-content">
+          <p className="box-description font-medium">
+            Con este botón demuestras al profesor en vivo exactamente cómo una transacción viaja por los 6 eventos requeridos en la rúbrica:
+          </p>
+
+          <div className="sequence-badge-flow">
+            <span className="step-pill">1. TransactionCreated</span>
+            <ArrowRight size={13} className="arrow-sep" />
+            <span className="step-pill">2. PaymentRequested</span>
+            <ArrowRight size={13} className="arrow-sep" />
+            <span className="step-pill step-rejected">3. PaymentRejected</span>
+            <ArrowRight size={13} className="arrow-sep" />
+            <span className="step-pill">4. PaymentRetried</span>
+            <ArrowRight size={13} className="arrow-sep" />
+            <span className="step-pill step-approved">5. PaymentApproved</span>
+            <ArrowRight size={13} className="arrow-sep" />
+            <span className="step-pill step-completed">6. TransactionCompleted</span>
+          </div>
+
+          <div className="demo-trigger-wrapper">
+            <button
+              type="button"
+              className="btn-command-execute max-w-sm"
+              onClick={handleRunFullCycleDemo}
+              disabled={isSeeding || !commandHealth.online}
+            >
+              <Sparkles size={16} />
+              <span>{isSeeding ? 'Generando eventos en vivo...' : 'Ejecutar Flujo Completo (6 Eventos en Vivo)'}</span>
+            </button>
+
+            {simulationStep && (
+              <span className="simulation-live-status">
+                <CheckCircle2 size={14} className="text-emerald-600" />
+                <span>{simulationStep}</span>
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Services Architecture Cards */}
+      <div className="system-nodes-grid mt-6">
         {/* Node 1: Command Service */}
         <div className="system-node-card">
           <div className="node-card-header">
-            <div className="node-icon-box bg-command">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polyline points="4 17 10 11 4 5" />
-                <line x1="12" y1="19" x2="20" y2="19" />
-              </svg>
+            <div className="node-icon-box">
+              <Terminal size={18} />
             </div>
             <div>
-              <h3>Command Service (Escritura)</h3>
+              <h3>Servicio 1: Command API (Escritura)</h3>
               <span className="node-url font-mono">{COMMAND_API_BASE}</span>
             </div>
             <span className={`status-pill ${commandHealth.online ? 'status-COMPLETED' : 'status-PAYMENT_REJECTED'}`}>
-              {commandHealth.online ? 'En Línea' : 'Offline'}
+              {commandHealth.online ? 'En línea' : 'Desconectado'}
             </span>
           </div>
 
           <div className="node-card-body">
             <p className="node-desc">
-              Servicio NestJS responsable de aceptar comandos, validar reglas de dominio, inmutabilidad y escribir eventos en <code>data/event-store.jsonl</code>.
+              <strong>Función principal:</strong> Recibe las acciones de los usuarios, valida las reglas del dominio y agrega eventos al final del archivo <code>data/event-store.jsonl</code>. No hace lecturas ni modifica registros anteriores.
             </p>
             <div className="node-specs">
               <div className="spec-row">
-                <span className="spec-label">Puerto:</span>
+                <span className="spec-label">Puerto en el sistema:</span>
                 <span className="spec-val font-mono">3000</span>
-              </div>
-              <div className="spec-row">
-                <span className="spec-label">Latencia Ping:</span>
-                <span className="spec-val font-mono">{commandHealth.latency ? `${commandHealth.latency} ms` : '—'}</span>
               </div>
               <div className="spec-row">
                 <span className="spec-label">Documentación Swagger:</span>
@@ -123,7 +181,8 @@ export default function SystemView({
                   rel="noopener noreferrer"
                   className="spec-link"
                 >
-                  Abrir Swagger UI ↗
+                  <span>Abrir Swagger UI (:3000/api/docs)</span>
+                  <ExternalLink size={12} />
                 </a>
               </div>
             </div>
@@ -133,79 +192,41 @@ export default function SystemView({
         {/* Node 2: History Service */}
         <div className="system-node-card">
           <div className="node-card-header">
-            <div className="node-icon-box bg-history">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <ellipse cx="12" cy="5" rx="9" ry="3" />
-                <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" />
-                <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
-              </svg>
+            <div className="node-icon-box">
+              <Database size={18} />
             </div>
             <div>
-              <h3>History Service (Lectura / Query)</h3>
+              <h3>Servicio 2: History API (Lectura)</h3>
               <span className="node-url font-mono">{HISTORY_API_BASE}</span>
             </div>
             <span className={`status-pill ${historyHealth.online ? 'status-COMPLETED' : 'status-PAYMENT_REJECTED'}`}>
-              {historyHealth.online ? 'En Línea' : 'Offline'}
+              {historyHealth.online ? 'En línea' : 'Desconectado'}
             </span>
           </div>
 
           <div className="node-card-body">
             <p className="node-desc">
-              Servicio de consulta desacoplado. Lee de forma solo-lectura el log de eventos y expone el estado reconstruido en memoria mediante la función de reducción <code>replay</code>.
+              <strong>Función principal:</strong> Lee el archivo de eventos de solo-lectura y reconstruye el estado actual de cada transacción mediante la función <code>replay(eventos)</code>. Demuestra la separación estricta entre lectura y escritura (CQRS).
             </p>
             <div className="node-specs">
               <div className="spec-row">
-                <span className="spec-label">Puerto:</span>
+                <span className="spec-label">Puerto en el sistema:</span>
                 <span className="spec-val font-mono">3001</span>
               </div>
               <div className="spec-row">
-                <span className="spec-label">Latencia Ping:</span>
-                <span className="spec-val font-mono">{historyHealth.latency ? `${historyHealth.latency} ms` : '—'}</span>
-              </div>
-              <div className="spec-row">
-                <span className="spec-label">Visor Nativo:</span>
+                <span className="spec-label">Visor HTML integrado:</span>
                 <a
                   href={`${HISTORY_API_BASE}/`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="spec-link"
                 >
-                  Abrir Historial HTML ↗
+                  <span>Abrir Vista de Consulta (:3001/)</span>
+                  <ExternalLink size={12} />
                 </a>
               </div>
             </div>
           </div>
-        </div>
-      </div>
-
-      {/* Demo Seeder & Benchmarking */}
-      <div className="admin-box-card mt-6">
-        <div className="box-card-header">
-          <div className="box-title-group">
-            <span className="box-badge">Herramientas de Demostración</span>
-            <h3>Generador de Flujo Completo Event Sourcing</h3>
-          </div>
-        </div>
-
-        <div className="box-card-content">
-          <p className="box-description">
-            Genera automáticamente una transacción completa recorriendo todo el ciclo auditable con rechazo y reintento en tiempo real:
-            <code> TransactionCreated (v1)</code> →
-            <code> PaymentRequested (v2)</code> →
-            <code> PaymentRejected (v3)</code> →
-            <code> PaymentRetried (v4)</code> →
-            <code> PaymentApproved (v5)</code> →
-            <code> TransactionCompleted (v6)</code>.
-          </p>
-
-          <button
-            type="button"
-            className="btn-command-execute max-w-xs"
-            onClick={handleRunFullCycleDemo}
-            disabled={isSeeding || !commandHealth.online}
-          >
-            {isSeeding ? 'Emitiendo eventos en vivo...' : '⚡ Generar Transacción de Demostración (6 Eventos)'}
-          </button>
         </div>
       </div>
     </div>
