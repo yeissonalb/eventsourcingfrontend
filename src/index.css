@@ -1,49 +1,67 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
 :root {
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
 
-  /* Colors */
-  --bg-main: #090d16;
-  --bg-card: rgba(17, 24, 39, 0.75);
-  --bg-card-hover: rgba(24, 33, 53, 0.85);
-  --bg-card-solid: #111827;
-  --bg-input: #0b1120;
-  
-  --border-subtle: rgba(255, 255, 255, 0.08);
-  --border-focus: #6366f1;
-  --border-active: rgba(99, 102, 241, 0.4);
+  /* shadcn/ui Neutral / Zinc Design Tokens */
+  --background: #ffffff;
+  --foreground: #09090b;
 
-  --text-main: #f1f5f9;
-  --text-muted: #94a3b8;
-  --text-dim: #64748b;
+  --card: #ffffff;
+  --card-foreground: #09090b;
 
-  /* Accents */
-  --accent-primary: #6366f1;
-  --accent-primary-hover: #4f46e5;
-  --accent-command: #0284c7;
-  --accent-history: #7c3aed;
+  --popover: #ffffff;
+  --popover-foreground: #09090b;
 
-  /* State Badges */
-  --status-created: #0284c7;
-  --status-created-bg: rgba(2, 132, 199, 0.15);
-  
-  --status-pending: #d97706;
-  --status-pending-bg: rgba(217, 119, 6, 0.15);
-  
-  --status-rejected: #e11d48;
-  --status-rejected-bg: rgba(225, 29, 72, 0.15);
-  
-  --status-approved: #059669;
-  --status-approved-bg: rgba(5, 150, 105, 0.15);
-  
-  --status-completed: #16a34a;
-  --status-completed-bg: rgba(22, 163, 74, 0.15);
+  --primary: #18181b;
+  --primary-foreground: #fafafa;
+  --primary-hover: #27272a;
 
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 4px 16px -2px rgba(0, 0, 0, 0.5);
-  --shadow-lg: 0 10px 30px -5px rgba(0, 0, 0, 0.6);
-  --shadow-glow-indigo: 0 0 25px rgba(99, 102, 241, 0.25);
-  --shadow-glow-cyan: 0 0 25px rgba(2, 132, 199, 0.25);
+  --secondary: #f4f4f5;
+  --secondary-foreground: #18181b;
+  --secondary-hover: #e4e4e7;
+
+  --muted: #f4f4f5;
+  --muted-foreground: #71717a;
+
+  --accent: #f4f4f5;
+  --accent-foreground: #18181b;
+
+  --destructive: #ef4444;
+  --destructive-foreground: #fafafa;
+
+  --border: #e4e4e7;
+  --input: #e4e4e7;
+  --ring: #18181b;
+
+  --radius: 0.5rem;
+
+  /* Status Colors in shadcn/ui subtle aesthetic (no harsh rainbow tones) */
+  --status-created-bg: #f4f4f5;
+  --status-created-fg: #3f3f46;
+  --status-created-border: #e4e4e7;
+
+  --status-pending-bg: #fffbeb;
+  --status-pending-fg: #b45309;
+  --status-pending-border: #fde68a;
+
+  --status-rejected-bg: #fef2f2;
+  --status-rejected-fg: #b91c1c;
+  --status-rejected-border: #fecaca;
+
+  --status-approved-bg: #ecfdf5;
+  --status-approved-fg: #047857;
+  --status-approved-border: #a7f3d0;
+
+  --status-completed-bg: #ecfdf5;
+  --status-completed-fg: #047857;
+  --status-completed-border: #a7f3d0;
+
+  /* Shadows (shadcn minimalist shadows) */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
 }
 
 *, *::before, *::after {
@@ -54,13 +72,8 @@ body {
   margin: 0;
   padding: 0;
   min-height: 100vh;
-  background-color: var(--bg-main);
-  background-image: 
-    radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.12) 0px, transparent 50%),
-    radial-gradient(at 100% 100%, rgba(124, 58, 237, 0.1) 0px, transparent 50%),
-    radial-gradient(at 50% 50%, rgba(2, 132, 199, 0.05) 0px, transparent 50%);
-  background-attachment: fixed;
-  color: var(--text-main);
+  background-color: var(--background);
+  color: var(--foreground);
   font-family: var(--font-sans);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
@@ -75,6 +88,7 @@ body {
 
 button {
   font-family: inherit;
+  cursor: pointer;
 }
 
 input, select, textarea {
