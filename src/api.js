@@ -1,5 +1,7 @@
 // Advanced API Client for Command Service and History Service
 
+import { logs, SeverityNumber } from '@opentelemetry/api-logs';
+
 const cleanUrl = (url, fallback) => {
   const target = url || fallback;
   return target.trim().replace(/\/+$/, '');
@@ -25,6 +27,12 @@ async function handleResponse(res) {
     }
     const err = new Error(errorDetail || `Error HTTP ${res.status}`);
     err.status = res.status;
+    logs.getLogger('eventsourcing-fe').emit({
+      severityNumber: res.status >= 500 ? SeverityNumber.ERROR : SeverityNumber.WARN,
+      severityText: res.status >= 500 ? 'ERROR' : 'WARN',
+      body: `La API respondió ${res.status}: ${err.message}`,
+      attributes: { http_status_code: res.status, http_url: res.url, reason: err.message },
+    });
     throw err;
   }
   return res.json();
