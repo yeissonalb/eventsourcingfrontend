@@ -8,23 +8,11 @@ import { FetchInstrumentation } from '@opentelemetry/instrumentation-fetch'
 import { resourceFromAttributes } from '@opentelemetry/resources'
 import { BatchLogRecordProcessor, LoggerProvider } from '@opentelemetry/sdk-logs'
 import { BatchSpanProcessor, WebTracerProvider } from '@opentelemetry/sdk-trace-web'
-
-const SIGNAL_PATHS = {
-  traces: '/v1/traces',
-  logs: '/v1/logs',
-}
-
-export function otelEnabled(flag = import.meta.env.VITE_OTEL_ENABLED) {
-  return flag === 'true'
-}
-
-export function otelSignalUrl(apiBase, signal) {
-  const base = (apiBase ?? '').trim().replace(/\/+$/, '')
-  return `${base}/otlp${SIGNAL_PATHS[signal]}`
-}
+import { COMMAND_API_BASE, HISTORY_API_BASE } from './api.js'
+import { otelEnabled, otelSignalUrl, traceHeaderUrls } from './otel-config.js'
 
 export function initOtel() {
-  if (!otelEnabled()) return
+  if (!otelEnabled(import.meta.env.VITE_OTEL_ENABLED)) return
 
   try {
     const resource = resourceFromAttributes({
@@ -72,7 +60,10 @@ export function initOtel() {
 
     registerInstrumentations({
       instrumentations: [
-        new FetchInstrumentation({ ignoreUrls: [/\/otlp/] }),
+        new FetchInstrumentation({
+          ignoreUrls: [/\/otlp/],
+          propagateTraceHeaderCorsUrls: traceHeaderUrls([COMMAND_API_BASE, HISTORY_API_BASE]),
+        }),
         new DocumentLoadInstrumentation(),
       ],
     })
