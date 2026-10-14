@@ -1,48 +1,51 @@
 import React from 'react';
 import {
-  LayoutDashboard,
+  Building2,
+  Send,
   Receipt,
-  CreditCard,
-  Database,
+  Clock,
   Sparkles,
+  BookOpen,
   ChevronLeft,
   ChevronRight,
   ShieldCheck,
+  CreditCard,
+  History,
 } from 'lucide-react';
 
 export default function Sidebar({ currentView, setCurrentView, collapsed, setCollapsed }) {
   const navItems = [
     {
-      group: 'TRANSACCIONES',
+      group: 'MI BANCA DIGITAL',
       items: [
         {
           id: 'overview',
-          label: 'Panel General',
-          icon: LayoutDashboard,
+          label: 'Inicio & Cuentas',
+          icon: Building2,
+        },
+        {
+          id: 'checkout',
+          label: 'Transferir / Pagar',
+          icon: Send,
         },
         {
           id: 'transactions',
-          label: 'Historial de Pagos',
-          icon: Receipt,
-        },
-        {
-          id: 'commands',
-          label: 'Procesar un Pago',
-          icon: CreditCard,
+          label: 'Extracto de Movimientos',
+          icon: History,
         },
       ],
     },
     {
-      group: 'EVENT SOURCING',
+      group: 'SERVICIOS Y SEGUIMIENTO',
       items: [
         {
-          id: 'eventstore',
-          label: 'Auditoría y Eventos',
-          icon: Database,
+          id: 'timeline',
+          label: 'Rastreo de Transferencias',
+          icon: Clock,
         },
         {
-          id: 'system',
-          label: 'Simulador para Exposición',
+          id: 'simulator',
+          label: 'Simulador de Red',
           icon: Sparkles,
         },
       ],
@@ -56,16 +59,16 @@ export default function Sidebar({ currentView, setCurrentView, collapsed, setCol
         <div
           className="brand-logo-icon"
           onClick={() => collapsed && setCollapsed(false)}
-          title={collapsed ? 'Haga clic para expandir barra lateral' : undefined}
+          title={collapsed ? 'Haga clic para expandir menú' : undefined}
           style={{ cursor: collapsed ? 'pointer' : 'default' }}
         >
-          <ShieldCheck size={20} strokeWidth={2.2} />
+          <Building2 size={22} strokeWidth={2.2} />
         </div>
 
         {!collapsed && (
           <div className="brand-text">
-            <h2>Auditoría de Pagos</h2>
-            <span>EVENT SOURCING DEMO</span>
+            <h2>PayBank</h2>
+            <span>BANCA DIGITAL & AUDITORÍA</span>
           </div>
         )}
 
@@ -116,14 +119,14 @@ export default function Sidebar({ currentView, setCurrentView, collapsed, setCol
 
       {/* Footer Info */}
       <div className="sidebar-footer">
-        <div className="operator-avatar" title="Proyecto Paradigmas de Programación">
-          <span>ES</span>
+        <div className="operator-avatar" title="PayBank Digital">
+          <span>PB</span>
           <span className="status-indicator-dot online" />
         </div>
         {!collapsed && (
           <div className="operator-info">
-            <span className="operator-name">Equipo del Proyecto</span>
-            <span className="operator-role">Event Sourcing · NestJS</span>
+            <span className="operator-name">Banca Empresarial</span>
+            <span className="operator-role">Event Sourcing Core</span>
           </div>
         )}
         {collapsed && (

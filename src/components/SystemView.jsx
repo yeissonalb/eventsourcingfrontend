@@ -1,15 +1,20 @@
 import React, { useState } from 'react';
 import {
   Sparkles,
-  ArrowRight,
-  Terminal,
-  Database,
-  ExternalLink,
+  Zap,
+  RotateCcw,
+  AlertTriangle,
   CheckCircle2,
+  Clock,
+  Play,
+  Layers,
+  Building2,
+  ShieldCheck,
+  Server,
+  Send,
+  CreditCard,
 } from 'lucide-react';
 import {
-  COMMAND_API_BASE,
-  HISTORY_API_BASE,
   createTransaction,
   requestPayment,
   rejectPayment,
@@ -23,209 +28,325 @@ export default function SystemView({
   historyHealth,
   showNotification,
   refreshTransactions,
+  onGoToTimeline,
+  onDeductBalance,
 }) {
-  const [isSeeding, setIsSeeding] = useState(false);
-  const [simulationStep, setSimulationStep] = useState(null);
+  const [isSimulating, setIsSimulating] = useState(false);
+  const [currentStepMessage, setCurrentStepMessage] = useState(null);
+  const [activeSimulationType, setActiveSimulationType] = useState(null);
 
-  // Generate automated full lifecycle demo transaction (The 6 required events)
-  const handleRunFullCycleDemo = async () => {
-    setIsSeeding(true);
-    showNotification('success', 'Iniciando demostración en vivo de los 6 eventos...');
+  // 1. Simulación Completa de Compensación Interbancaria (6 Pasos)
+  const handleFullCycleDemo = async () => {
+    setIsSimulating(true);
+    setActiveSimulationType('full');
+    showNotification('success', 'Iniciando simulación de transferencia interbancaria (6 pasos)...');
 
     try {
-      const demoCust = `cliente-exposicion-${Math.floor(100 + Math.random() * 900)}`;
-      const demoAmount = 25000;
+      const demoCust = `Comercio Proveedor #${Math.floor(100 + Math.random() * 900)}`;
+      const demoAmount = 28500;
 
-      // Paso 1: TransactionCreated (v1)
-      setSimulationStep('1/6: Registrando TransactionCreated (v1)...');
+      // Paso 1: TransactionCreated
+      setCurrentStepMessage('1/6: Generando orden de transferencia por ₡28,500...');
       const step1 = await createTransaction({
         amount: demoAmount,
         currency: 'CRC',
         customerId: demoCust,
       });
-      const txId = step1.transactionId;
+      const txId = step1.transactionId || step1.state?.transactionId || step1.event?.transactionId;
+      if (!txId) {
+        throw new Error('No se pudo obtener el identificador de la transacción');
+      }
 
-      // Paso 2: PaymentRequested (v2)
-      await new Promise((r) => setTimeout(r, 600));
-      setSimulationStep('2/6: Registrando PaymentRequested (v2)...');
+      // Paso 2: PaymentRequested
+      await new Promise((r) => setTimeout(r, 700));
+      setCurrentStepMessage('2/6: Conectando con la red bancaria y solicitando débito...');
       await requestPayment(txId, {
         amount: demoAmount,
         expectedVersion: 1,
       });
 
-      // Paso 3: PaymentRejected (v3)
-      await new Promise((r) => setTimeout(r, 600));
-      setSimulationStep('3/6: Simulando rechazo del banco: PaymentRejected (v3)...');
+      // Paso 3: PaymentRejected
+      await new Promise((r) => setTimeout(r, 700));
+      setCurrentStepMessage('3/6: Banco emisor declina la operación ("Fondos insuficientes")...');
       await rejectPayment(txId, {
-        reason: 'Fondos insuficientes en la cuenta bancaria',
+        reason: 'Fondos insuficientes en la cuenta origen',
         expectedVersion: 2,
       });
 
-      // Paso 4: PaymentRetried (v4)
-      await new Promise((r) => setTimeout(r, 600));
-      setSimulationStep('4/6: Reintentando cobro automático: PaymentRetried (v4)...');
+      // Paso 4: PaymentRetried
+      await new Promise((r) => setTimeout(r, 700));
+      setCurrentStepMessage('4/6: Cliente confirma fondos disponibles. Reintentando procesamiento...');
       await retryPayment(txId, {
         attemptNumber: 2,
         expectedVersion: 3,
       });
 
-      // Paso 5: PaymentApproved (v5)
-      await new Promise((r) => setTimeout(r, 600));
-      setSimulationStep('5/6: Banco aprueba el pago: PaymentApproved (v5)...');
+      // Paso 5: PaymentApproved
+      await new Promise((r) => setTimeout(r, 700));
+      setCurrentStepMessage('5/6: Banco autoriza la transferencia con código AUTH-982143...');
       await approvePayment(txId, {
-        approvalCode: `AUTH-EXPO-${Math.floor(1000 + Math.random() * 9000)}`,
+        approvalCode: `AUTH-SINPE-${Math.floor(1000 + Math.random() * 9000)}`,
         expectedVersion: 4,
       });
 
-      // Paso 6: TransactionCompleted (v6)
-      await new Promise((r) => setTimeout(r, 600));
-      setSimulationStep('6/6: Cerrando la operación: TransactionCompleted (v6)...');
+      // Paso 6: TransactionCompleted
+      await new Promise((r) => setTimeout(r, 700));
+      setCurrentStepMessage('6/6: Fondos compensados y comprobante bancario emitido!');
       await completeTransaction(txId, {
         completedAt: new Date().toISOString(),
         expectedVersion: 5,
       });
 
-      setSimulationStep('¡Completado con éxito!');
+      if (onDeductBalance) {
+        onDeductBalance(demoAmount);
+      }
+
+      setCurrentStepMessage('¡Transferencia interbancaria completada con éxito!');
       await refreshTransactions(txId);
-      showNotification('success', `¡Demostración lista! Se guardaron los 6 eventos de la transacción ${txId}`);
+      showNotification('success', `¡Listo! Transferencia liquidada para ${demoCust}`);
     } catch (err) {
-      showNotification('error', `Aviso en simulación: ${err.message}`);
+      showNotification('error', `Aviso en simulación bancaria: ${err.message}`);
     } finally {
-      setIsSeeding(false);
-      setTimeout(() => setSimulationStep(null), 4000);
+      setIsSimulating(false);
+      setTimeout(() => {
+        setCurrentStepMessage(null);
+        setActiveSimulationType(null);
+      }, 4000);
+    }
+  };
+
+  // 2. Simulación Pago Inmediato (Camino Feliz)
+  const handleHappyPathDemo = async () => {
+    setIsSimulating(true);
+    setActiveSimulationType('happy');
+    showNotification('success', 'Simulando pago inmediato aprobado...');
+
+    try {
+      const cust = `Supermercado Express #${Math.floor(10 + Math.random() * 90)}`;
+      const amt = 16500;
+
+      setCurrentStepMessage('1/4: Preparando pago en línea...');
+      const s1 = await createTransaction({ amount: amt, currency: 'CRC', customerId: cust });
+      const txId = s1.transactionId || s1.state?.transactionId || s1.event?.transactionId;
+      if (!txId) {
+        throw new Error('No se pudo obtener el identificador de la transacción');
+      }
+
+      await new Promise((r) => setTimeout(r, 600));
+      setCurrentStepMessage('2/4: Transmitiendo a la red de tarjetas...');
+      await requestPayment(txId, { amount: amt, expectedVersion: 1 });
+
+      await new Promise((r) => setTimeout(r, 600));
+      setCurrentStepMessage('3/4: Pago aprobado inmediatamente por el emisor...');
+      await approvePayment(txId, {
+        approvalCode: `AUTH-RAPIDA-${Math.floor(1000 + Math.random() * 9000)}`,
+        expectedVersion: 2,
+      });
+
+      await new Promise((r) => setTimeout(r, 600));
+      setCurrentStepMessage('4/4: Comprobante oficial emitido...');
+      await completeTransaction(txId, {
+        completedAt: new Date().toISOString(),
+        expectedVersion: 3,
+      });
+
+      if (onDeductBalance) {
+        onDeductBalance(amt);
+      }
+
+      setCurrentStepMessage('¡Pago acreditado de inmediato!');
+      await refreshTransactions(txId);
+      showNotification('success', 'Pago con tarjeta aprobado y liquidado.');
+    } catch (err) {
+      showNotification('error', `Error en simulación: ${err.message}`);
+    } finally {
+      setIsSimulating(false);
+      setTimeout(() => {
+        setCurrentStepMessage(null);
+        setActiveSimulationType(null);
+      }, 4000);
+    }
+  };
+
+  // 3. Simulación Declinación por Seguridad
+  const handleRejectDemo = async () => {
+    setIsSimulating(true);
+    setActiveSimulationType('reject');
+
+    try {
+      const cust = `Tienda Electrónica #${Math.floor(10 + Math.random() * 90)}`;
+      const amt = 45000;
+
+      setCurrentStepMessage('1/3: Solicitando débito...');
+      const s1 = await createTransaction({ amount: amt, currency: 'CRC', customerId: cust });
+      const txId = s1.transactionId || s1.state?.transactionId || s1.event?.transactionId;
+      if (!txId) {
+        throw new Error('No se pudo obtener el identificador de la transacción');
+      }
+
+      await new Promise((r) => setTimeout(r, 600));
+      setCurrentStepMessage('2/3: Verificando fondos y políticas de fraude...');
+      await requestPayment(txId, { amount: amt, expectedVersion: 1 });
+
+      await new Promise((r) => setTimeout(r, 600));
+      setCurrentStepMessage('3/3: Banco responde: "Tarjeta bloqueada por seguridad"...');
+      await rejectPayment(txId, {
+        reason: 'Tarjeta bloqueada preventivamente por seguridad o reporte de robo',
+        expectedVersion: 2,
+      });
+
+      setCurrentStepMessage('¡Operación declinada registrada en el sistema!');
+      await refreshTransactions(txId);
+      showNotification('error', 'Operación Declinada por el Banco (Lista para reintentar).');
+    } catch (err) {
+      showNotification('error', `Error en simulación: ${err.message}`);
+    } finally {
+      setIsSimulating(false);
+      setTimeout(() => {
+        setCurrentStepMessage(null);
+        setActiveSimulationType(null);
+      }, 4000);
     }
   };
 
   return (
-    <div className="system-view-container">
-      {/* Demo Seeder Hero Box */}
-      <div className="admin-box-card highlight-card">
-        <div className="box-card-header">
-          <div className="box-title-group">
-            <span className="box-badge">Herramienta para la Exposición</span>
-            <h3>Demostración Automática de los 6 Eventos Requeridos</h3>
+    <div className="bank-simulator-container">
+      {/* Hero Banner */}
+      <div className="bank-sim-hero">
+        <div className="sim-badge">
+          <Building2 size={14} />
+          <span>Simulador de Operaciones Bancarias</span>
+        </div>
+        <h2>Pruebas de Pasarela y Compensación en 1 Clic</h2>
+        <p>
+          Genera escenarios reales de pagos con tarjeta y transferencias interbancarias para observar cómo la red de PayBank procesa autorizaciones en tiempo real, gestiona reintentos y asegura la disponibilidad de tus transacciones.
+        </p>
+
+        {currentStepMessage && (
+          <div className="sim-status-banner">
+            <div className="sim-spinner" />
+            <span>{currentStepMessage}</span>
           </div>
+        )}
+      </div>
+
+      {/* Simulator Cards */}
+      <div className="bank-sim-scenarios-grid">
+        {/* Escenario 1: 6 Pasos Completos */}
+        <div className="sim-scenario-card highlight-card">
+          <div className="scenario-top">
+            <span className="scenario-tag">Caso Completo de Auditoría</span>
+            <Building2 size={20} className="text-emerald" />
+          </div>
+          <h3>Compensación Interbancaria (6 Pasos)</h3>
+          <p>
+            Simula el flujo completo con rechazo y segundo intento exitoso:
+          </p>
+          <ul className="scenario-steps">
+            <li>1. Solicitud de transferencia (v1)</li>
+            <li>2. Transmisión a la red bancaria (v2)</li>
+            <li>3. Declinación por falta de saldo (v3)</li>
+            <li>4. Reintento de compensación (v4)</li>
+            <li>5. Autorización con código bancario (v5)</li>
+            <li>6. Liquidación y comprobante final (v6)</li>
+          </ul>
+          <button
+            type="button"
+            className="btn-sim-action btn-sim-primary"
+            onClick={handleFullCycleDemo}
+            disabled={isSimulating}
+          >
+            <Play size={16} />
+            <span>{isSimulating && activeSimulationType === 'full' ? 'Simulando...' : 'Ejecutar Transferencia Completa'}</span>
+          </button>
         </div>
 
-        <div className="box-card-content">
-          <p className="box-description font-medium">
-            Con este botón demuestras al profesor en vivo exactamente cómo una transacción viaja por los 6 eventos requeridos en la rúbrica:
+        {/* Escenario 2: Camino Feliz */}
+        <div className="sim-scenario-card">
+          <div className="scenario-top">
+            <span className="scenario-tag neutral">Pago Inmediato</span>
+            <Zap size={20} className="text-amber" />
+          </div>
+          <h3>Pago Aprobado de Inmediato</h3>
+          <p>
+            Simula un pago donde la tarjeta cuenta con saldo y pasa en el primer intento:
           </p>
+          <ul className="scenario-steps">
+            <li>1. Preparar pago</li>
+            <li>2. Enrutar a procesador</li>
+            <li>3. Autorización confirmada</li>
+            <li>4. Emisión de comprobante</li>
+          </ul>
+          <button
+            type="button"
+            className="btn-sim-action btn-sim-secondary"
+            onClick={handleHappyPathDemo}
+            disabled={isSimulating}
+          >
+            <Play size={16} />
+            <span>{isSimulating && activeSimulationType === 'happy' ? 'Simulando...' : 'Simular Pago Inmediato'}</span>
+          </button>
+        </div>
 
-          <div className="sequence-badge-flow">
-            <span className="step-pill">1. TransactionCreated</span>
-            <ArrowRight size={13} className="arrow-sep" />
-            <span className="step-pill">2. PaymentRequested</span>
-            <ArrowRight size={13} className="arrow-sep" />
-            <span className="step-pill step-rejected">3. PaymentRejected</span>
-            <ArrowRight size={13} className="arrow-sep" />
-            <span className="step-pill">4. PaymentRetried</span>
-            <ArrowRight size={13} className="arrow-sep" />
-            <span className="step-pill step-approved">5. PaymentApproved</span>
-            <ArrowRight size={13} className="arrow-sep" />
-            <span className="step-pill step-completed">6. TransactionCompleted</span>
+        {/* Escenario 3: Rechazo */}
+        <div className="sim-scenario-card">
+          <div className="scenario-top">
+            <span className="scenario-tag neutral">Fallo Bancario</span>
+            <AlertTriangle size={20} className="text-rose" />
           </div>
-
-          <div className="demo-trigger-wrapper">
-            <button
-              type="button"
-              className="btn-command-execute max-w-sm"
-              onClick={handleRunFullCycleDemo}
-              disabled={isSeeding || !commandHealth.online}
-            >
-              <Sparkles size={16} />
-              <span>{isSeeding ? 'Generando eventos en vivo...' : 'Ejecutar Flujo Completo (6 Eventos en Vivo)'}</span>
-            </button>
-
-            {simulationStep && (
-              <span className="simulation-live-status">
-                <CheckCircle2 size={14} className="text-emerald-600" />
-                <span>{simulationStep}</span>
-              </span>
-            )}
-          </div>
+          <h3>Simular Declinación Bancaria</h3>
+          <p>
+            Simula una tarjeta bloqueada por el banco emisor para practicar el reintento:
+          </p>
+          <ul className="scenario-steps">
+            <li>1. Iniciar pago</li>
+            <li>2. Enviar a validación</li>
+            <li>3. Declinación por seguridad</li>
+            <li>(Queda lista para reintentar)</li>
+          </ul>
+          <button
+            type="button"
+            className="btn-sim-action btn-sim-danger"
+            onClick={handleRejectDemo}
+            disabled={isSimulating}
+          >
+            <Play size={16} />
+            <span>{isSimulating && activeSimulationType === 'reject' ? 'Simulando...' : 'Simular Declinación'}</span>
+          </button>
         </div>
       </div>
 
-      {/* Services Architecture Cards */}
-      <div className="system-nodes-grid mt-6">
-        {/* Node 1: Command Service */}
-        <div className="system-node-card">
-          <div className="node-card-header">
-            <div className="node-icon-box">
-              <Terminal size={18} />
-            </div>
-            <div>
-              <h3>Servicio 1: Command API (Escritura)</h3>
-              <span className="node-url font-mono">{COMMAND_API_BASE}</span>
-            </div>
-            <span className={`status-pill ${commandHealth.online ? 'status-COMPLETED' : 'status-PAYMENT_REJECTED'}`}>
-              {commandHealth.online ? 'En línea' : 'Desconectado'}
-            </span>
-          </div>
-
-          <div className="node-card-body">
-            <p className="node-desc">
-              <strong>Función principal:</strong> Recibe las acciones de los usuarios, valida las reglas del dominio y agrega eventos al final del archivo <code>data/event-store.jsonl</code>. No hace lecturas ni modifica registros anteriores.
-            </p>
-            <div className="node-specs">
-              <div className="spec-row">
-                <span className="spec-label">Puerto en el sistema:</span>
-                <span className="spec-val font-mono">3000</span>
-              </div>
-              <div className="spec-row">
-                <span className="spec-label">Documentación Swagger:</span>
-                <a
-                  href={`${COMMAND_API_BASE}/api/docs`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="spec-link"
-                >
-                  <span>Abrir Swagger UI (:3000/api/docs)</span>
-                  <ExternalLink size={12} />
-                </a>
-              </div>
-            </div>
-          </div>
+      {/* Backend Infrastructure Nodes */}
+      <div className="bank-nodes-status-card">
+        <div className="nodes-title-row">
+          <Server size={18} />
+          <h4>Estado de Conexión de Servidores de Red</h4>
         </div>
-
-        {/* Node 2: History Service */}
-        <div className="system-node-card">
-          <div className="node-card-header">
-            <div className="node-icon-box">
-              <Database size={18} />
+        <div className="nodes-grid">
+          <div className="node-box">
+            <div className="node-info">
+              <span className={`status-dot ${commandHealth.online ? 'online' : 'offline'}`} />
+              <div>
+                <strong>Servicio Transaccional (Command API)</strong>
+                <span>Puerto 3000 · Procesamiento bancario en tiempo real</span>
+              </div>
             </div>
-            <div>
-              <h3>Servicio 2: History API (Lectura)</h3>
-              <span className="node-url font-mono">{HISTORY_API_BASE}</span>
-            </div>
-            <span className={`status-pill ${historyHealth.online ? 'status-COMPLETED' : 'status-PAYMENT_REJECTED'}`}>
-              {historyHealth.online ? 'En línea' : 'Desconectado'}
+            <span className={`badge-pill ${commandHealth.online ? 'healthy' : 'error'}`}>
+              {commandHealth.online ? `En línea (${commandHealth.latency || 5}ms)` : 'Desconectado'}
             </span>
           </div>
 
-          <div className="node-card-body">
-            <p className="node-desc">
-              <strong>Función principal:</strong> Lee el archivo de eventos de solo-lectura y reconstruye el estado actual de cada transacción mediante la función <code>replay(eventos)</code>. Demuestra la separación estricta entre lectura y escritura (CQRS).
-            </p>
-            <div className="node-specs">
-              <div className="spec-row">
-                <span className="spec-label">Puerto en el sistema:</span>
-                <span className="spec-val font-mono">3001</span>
-              </div>
-              <div className="spec-row">
-                <span className="spec-label">Visor HTML integrado:</span>
-                <a
-                  href={`${HISTORY_API_BASE}/`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="spec-link"
-                >
-                  <span>Abrir Vista de Consulta (:3001/)</span>
-                  <ExternalLink size={12} />
-                </a>
+          <div className="node-box">
+            <div className="node-info">
+              <span className={`status-dot ${historyHealth.online ? 'online' : 'offline'}`} />
+              <div>
+                <strong>Servicio de Extractos (History API)</strong>
+                <span>Puerto 3001 · Historial y consulta de movimientos</span>
               </div>
             </div>
+            <span className={`badge-pill ${historyHealth.online ? 'healthy' : 'error'}`}>
+              {historyHealth.online ? `En línea (${historyHealth.latency || 5}ms)` : 'Desconectado'}
+            </span>
           </div>
         </div>
       </div>
