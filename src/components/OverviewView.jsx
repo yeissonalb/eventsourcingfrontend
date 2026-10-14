@@ -1,281 +1,699 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import {
-  DollarSign,
-  Layers,
-  CheckCircle2,
+  CreditCard,
+  ArrowUpRight,
+  ArrowDownLeft,
+  Send,
+  Eye,
+  EyeOff,
+  Receipt,
+  Sparkles,
+  ShieldCheck,
+  Clock,
   AlertTriangle,
-  AlertCircle,
-  Info,
-  ArrowRight,
+  CheckCircle2,
+  ChevronRight,
+  Building2,
+  Smartphone,
+  Lock,
+  PlusCircle,
+  Zap,
   Plus,
-  Inbox,
+  X,
+  Wallet,
+  RotateCcw,
+  History,
+  TrendingDown,
+  TrendingUp,
 } from 'lucide-react';
+import {
+  getStatusInfo,
+  formatMoney,
+  formatDateTime,
+  convertToCRC,
+  getCurrencyInfo,
+} from '../utils/statusHelpers';
 
 export default function OverviewView({
-  transactions,
+  transactions = [],
+  accountBalance = 150000,
+  rechargeHistory = [],
+  onRechargeBalance,
+  onResetBalance,
   onSelectTransaction,
-  onOpenCommandTerminal,
+  onOpenCheckout,
+  onOpenSimulator,
+  onOpenTransactions,
 }) {
-  // Financial metrics
-  const totalCount = transactions.length;
-  const completedCount = transactions.filter((t) => t.status === 'COMPLETED').length;
-  const pendingCount = transactions.filter((t) => t.status === 'PAYMENT_PENDING' || t.status === 'CREATED').length;
-  const rejectedCount = transactions.filter((t) => t.status === 'PAYMENT_REJECTED').length;
-  const approvedCount = transactions.filter((t) => t.status === 'PAYMENT_APPROVED').length;
+  const [showBalance, setShowBalance] = useState(true);
+  const [showRechargeModal, setShowRechargeModal] = useState(false);
+  const [rechargeAmount, setRechargeAmount] = useState('50000');
+  const [rechargeMethod, setRechargeMethod] = useState('SINPE Móvil');
+  const [rechargeNote, setRechargeNote] = useState('Abono a cuenta');
+  const [movementFilter, setMovementFilter] = useState('all'); // 'all' | 'transfers' | 'recharges'
 
-  const successRate = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+  // Financial statistics calculated in Colones (CRC)
+  const completedList = transactions.filter((t) => t.status === 'COMPLETED' || t.status === 'PAYMENT_APPROVED');
+  const pendingList = transactions.filter((t) => t.status === 'PAYMENT_PENDING' || t.status === 'CREATED');
+  const rejectedList = transactions.filter((t) => t.status === 'PAYMENT_REJECTED');
 
-  // Currencies volume
-  const volumeByCurrency = transactions.reduce((acc, tx) => {
-    const curr = tx.currency || 'CRC';
-    acc[curr] = (acc[curr] || 0) + (Number(tx.amount) || 0);
-    return acc;
-  }, {});
+  // Sum of all outgoing money (Salidas de dinero)
+  const totalDebitedCRC = transactions
+    .filter((t) => t.status !== 'PAYMENT_REJECTED')
+    .reduce((acc, tx) => acc + convertToCRC(tx.amount, tx.currency), 0);
 
-  const statusCounts = {
-    CREATED: transactions.filter((t) => t.status === 'CREATED').length,
-    PAYMENT_PENDING: transactions.filter((t) => t.status === 'PAYMENT_PENDING').length,
-    PAYMENT_REJECTED: rejectedCount,
-    PAYMENT_APPROVED: approvedCount,
-    COMPLETED: completedCount,
+  // Sum of in-flight pending money
+  const pendingSalesCRC = pendingList.reduce(
+    (acc, tx) => acc + convertToCRC(tx.amount, tx.currency),
+    0
+  );
+
+  // Sum of all incoming money (Ingresos / Recargas)
+  const totalRechargedCRC = rechargeHistory.reduce(
+    (acc, r) => acc + (Number(r.amount) || 0),
+    0
+  );
+
+  // Quick 1-click recharge preset
+  const handleApplyPreset = (amt) => {
+    setRechargeAmount(amt.toString());
   };
 
-  const statusLabels = {
-    CREATED: '1. Creada (CREATED)',
-    PAYMENT_PENDING: '2. Cobro Pendiente (PAYMENT_PENDING)',
-    PAYMENT_REJECTED: '3. Rechazada por Banco (PAYMENT_REJECTED)',
-    PAYMENT_APPROVED: '4. Pago Aprobado (PAYMENT_APPROVED)',
-    COMPLETED: '5. Finalizada (COMPLETED)',
+  const handleQuickAdd = (amt) => {
+    if (onRechargeBalance) {
+      onRechargeBalance(amt, 'Recarga Rápida', `Acreditación directa de ₡${amt.toLocaleString('es-CR')}`);
+    }
   };
 
-  const recentTransactions = [...transactions].slice(0, 5);
+  const handleConfirmRecharge = (e) => {
+    e.preventDefault();
+    if (!rechargeAmount || Number(rechargeAmount) <= 0) return;
+    const ok = onRechargeBalance(rechargeAmount, rechargeMethod, rechargeNote);
+    if (ok) {
+      setShowRechargeModal(false);
+    }
+  };
+
+  // Build unified chronologically sorted movements list
+  const unifiedMovements = useMemo(() => {
+    const list = [];
+    const seenTxIds = new Set();
+    const seenRecharges = [];
+
+    // Map outgoing transactions (Salidas de dinero / Pagos)
+    if (movementFilter === 'all' || movementFilter === 'transfers') {
+      transactions.forEach((tx) => {
+        if (!seenTxIds.has(tx.transactionId)) {
+          seenTxIds.add(tx.transactionId);
+          const eqCRC = convertToCRC(tx.amount, tx.currency);
+          list.push({
+            id: tx.transactionId,
+            type: 'transfer',
+            direction: 'out', // Salida de dinero
+            title: `Pago a ${tx.customerId || 'Destinatario'}`,
+            subtitle: `Ref: ${tx.transactionId.slice(0, 18)}...`,
+            rawDate: tx.createdAt || new Date().toISOString(),
+            amount: Number(tx.amount) || 0,
+            amountCRC: eqCRC,
+            currency: tx.currency || 'CRC',
+            status: tx.status,
+            approvalCode: tx.approvalCode,
+            rejectionReason: tx.lastRejectionReason,
+            originalTx: tx,
+          });
+        }
+      });
+    }
+
+    // Map incoming recharges (Ingresos de dinero / Acreditaciones)
+    if (movementFilter === 'all' || movementFilter === 'recharges') {
+      rechargeHistory.forEach((r) => {
+        const isDuplicate = seenRecharges.some((prev) => {
+          if (prev.id === r.id) return true;
+          const diff = Math.abs(new Date(prev.timestamp).getTime() - new Date(r.timestamp).getTime());
+          return diff < 4000 && Number(prev.amount) === Number(r.amount);
+        });
+
+        if (!isDuplicate) {
+          seenRecharges.push(r);
+          list.push({
+            id: r.id,
+            type: 'recharge',
+            direction: 'in', // Entrada de dinero
+            title: `Depósito Acreditado (${r.method || 'Recarga'})`,
+            subtitle: r.note || 'Ingreso de fondos a la cuenta',
+            rawDate: r.timestamp || new Date().toISOString(),
+            amount: Number(r.amount) || 0,
+            amountCRC: Number(r.amount) || 0,
+            currency: 'CRC',
+            status: 'COMPLETED',
+            balanceAfter: r.balanceAfter,
+          });
+        }
+      });
+    }
+
+    // Sort descending by date
+    list.sort((a, b) => new Date(b.rawDate).getTime() - new Date(a.rawDate).getTime());
+    return list;
+  }, [transactions, rechargeHistory, movementFilter]);
+
+  const isAccountFunded = accountBalance > 0;
 
   return (
-    <div className="overview-container">
-      {/* Presentation Hero Banner - Perfect for defending the project */}
-      <div className="presentation-hero-banner">
-        <div className="hero-badge">Tema 4: Historial Auditable de Transacciones</div>
-        <h2>¿Qué problema resuelve este proyecto y qué es Event Sourcing?</h2>
-        <div className="hero-columns-explanation">
-          <div className="hero-explanation-item">
-            <div className="hero-item-header">
-              <AlertCircle size={16} className="text-destructive-icon" />
-              <span className="hero-item-title">El Problema Tradicional:</span>
-            </div>
-            <p>
-              Si solo guardamos una fila en una base de datos con estado "COMPLETED", nadie sabe qué pasó antes: si hubo rechazos del banco, cuántos reintentos ocurrieron o quién lo autorizó. Se pierde toda la historia.
-            </p>
-          </div>
-          <div className="hero-explanation-item">
-            <div className="hero-item-header">
-              <CheckCircle2 size={16} className="text-success-icon" />
-              <span className="hero-item-title">La Solución con Event Sourcing:</span>
-            </div>
-            <p>
-              Nunca sobreescribimos datos. Cada hecho relevante se guarda como un <strong>evento inmutable</strong> en el archivo append-only. El estado actual se calcula en tiempo real aplicando <code>replay(eventos)</code>.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* KPI Cards Row */}
-      <div className="overview-kpi-grid">
-        {/* KPI 1: Volumen Financiero */}
-        <div className="kpi-card">
-          <div className="kpi-top">
-            <span className="kpi-label">Monto Total Procesado</span>
-            <div className="kpi-icon-pill">
-              <DollarSign size={16} />
-            </div>
-          </div>
-          <div className="kpi-amount">
-            {Object.keys(volumeByCurrency).length === 0 ? (
-              <span className="kpi-empty">0.00</span>
-            ) : (
-              Object.entries(volumeByCurrency).map(([curr, amt]) => (
-                <div key={curr} className="currency-line">
-                  <span className="currency-symbol">{curr}</span>
-                  <span className="currency-value">{amt.toLocaleString('es-CR', { minimumFractionDigits: 2 })}</span>
-                </div>
-              ))
-            )}
-          </div>
-          <span className="kpi-footnote">Suma calculada desde los eventos del store</span>
-        </div>
-
-        {/* KPI 2: Total Transacciones */}
-        <div className="kpi-card">
-          <div className="kpi-top">
-            <span className="kpi-label">Transacciones Registradas</span>
-            <div className="kpi-icon-pill">
-              <Layers size={16} />
-            </div>
-          </div>
-          <div className="kpi-metric-number">{totalCount}</div>
-          <div className="kpi-split-stat">
-            <span className="stat-highlight">{completedCount} finalizadas</span>
-            <span className="stat-separator">·</span>
-            <span className="stat-muted">{pendingCount} en proceso</span>
-          </div>
-        </div>
-
-        {/* KPI 3: Tasa de Finalización */}
-        <div className="kpi-card">
-          <div className="kpi-top">
-            <span className="kpi-label">Tasa de Finalización</span>
-            <div className="kpi-icon-pill">
-              <CheckCircle2 size={16} />
-            </div>
-          </div>
-          <div className="kpi-metric-number">{successRate}%</div>
-          <div className="kpi-progress-bar-bg">
-            <div
-              className="kpi-progress-bar-fill"
-              style={{ width: `${successRate}%` }}
-            />
-          </div>
-        </div>
-
-        {/* KPI 4: Control de Rechazos */}
-        <div className="kpi-card">
-          <div className="kpi-top">
-            <span className="kpi-label">Rechazos Registrados</span>
-            <div className="kpi-icon-pill">
-              <AlertTriangle size={16} />
-            </div>
-          </div>
-          <div className="kpi-metric-number">{rejectedCount}</div>
-          <span className="kpi-footnote">Registrados con motivo y listos para reintento</span>
-        </div>
-      </div>
-
-      {/* Main Two Columns */}
-      <div className="overview-split-grid">
-        {/* Left: State Distribution */}
-        <div className="admin-box-card">
-          <div className="box-card-header">
-            <div className="box-title-group">
-              <span className="box-badge">Reconstrucción en Vivo</span>
-              <h3>Distribución de Estados Actuales</h3>
-            </div>
-          </div>
-
-          <div className="box-card-content">
-            <p className="box-description">
-              El sistema recorre el historial de eventos para deducir en qué estado se encuentra cada pago:
-            </p>
-
-            <div className="status-bars-container">
-              {Object.entries(statusCounts).map(([status, count]) => {
-                const percent = totalCount > 0 ? Math.round((count / totalCount) * 100) : 0;
-                return (
-                  <div key={status} className="status-bar-item">
-                    <div className="status-bar-info">
-                      <span className={`status-pill status-${status}`}>{statusLabels[status] || status}</span>
-                      <span className="status-bar-count">
-                        <strong>{count}</strong> ({percent}%)
-                      </span>
-                    </div>
-                    <div className="bar-track">
-                      <div
-                        className="bar-fill"
-                        style={{ width: `${percent}%` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="event-sourcing-callout">
-              <div className="callout-icon">
-                <Info size={16} />
+    <div className="bank-overview-container">
+      {/* ======================================================================
+          SECCIÓN PRINCIPAL: CUENTA CORRIENTE & TARJETA PLATINUM
+          ====================================================================== */}
+      <div className="bank-hero-section">
+        {/* Left: Interactive Virtual Card */}
+        <div className="bank-card-container">
+          <div className="virtual-debit-card">
+            <div className="card-top-row">
+              <div className="card-chip-wrap">
+                <div className="emv-chip" />
+                <span className="contactless-icon">))))</span>
               </div>
-              <div className="callout-text">
-                <strong>Punto clave para la defensa:</strong>
-                <span> Cada evento nuevo agrega una línea al archivo <code>data/event-store.jsonl</code>. No existen sentencias UPDATE ni DELETE.</span>
+              <span className="card-bank-brand">PayBank Platinum</span>
+            </div>
+
+            <div className="card-number-row">
+              <span>••••</span>
+              <span>••••</span>
+              <span>••••</span>
+              <span>4892</span>
+            </div>
+
+            <div className="card-bottom-row">
+              <div className="card-holder-col">
+                <span className="card-label">TITULAR DE LA CUENTA</span>
+                <strong className="card-val">USUARIO PAYBANK / CUENTA CORRIENTE</strong>
+              </div>
+              <div className="card-expiry-col">
+                <span className="card-label">EXPIRA</span>
+                <strong className="card-val">10/28</strong>
+              </div>
+              <div className="card-network-badge">
+                <span className="circle-red" />
+                <span className="circle-orange" />
               </div>
             </div>
           </div>
         </div>
 
-        {/* Right: Recent Transactions Table */}
-        <div className="admin-box-card">
-          <div className="box-card-header">
-            <div className="box-title-group">
-              <span className="box-badge">En Vivo</span>
-              <h3>Últimas Transacciones Registradas</h3>
+        {/* Right: Apartado de Cuenta Corriente Principal */}
+        <div className="bank-balance-card">
+          <div className="balance-header">
+            <div className="balance-title-wrap">
+              <Building2 size={18} className="text-muted-foreground" />
+              <div>
+                <span className="account-type-title">Cuenta Corriente Principal (CRC ₡)</span>
+                <span className="account-iban-sub">IBAN: CR05 0102 0000 9876 5432 10</span>
+              </div>
             </div>
-            <button
-              type="button"
-              className="btn-link-action"
-              onClick={onOpenCommandTerminal}
-            >
-              <Plus size={14} />
-              <span>Nuevo Pago</span>
-            </button>
+            <div className="balance-header-actions">
+              <span className={`account-status-badge ${isAccountFunded ? 'status-active' : 'status-empty'}`}>
+                <span className="status-dot-active" />
+                {isAccountFunded ? 'Activa & con Fondos' : 'Sin Fondos Disponibles'}
+              </span>
+
+              <button
+                type="button"
+                className="btn-toggle-balance"
+                onClick={() => setShowBalance(!showBalance)}
+                title={showBalance ? 'Ocultar saldos' : 'Mostrar saldos'}
+              >
+                {showBalance ? <EyeOff size={15} /> : <Eye size={15} />}
+                <span>{showBalance ? 'Ocultar' : 'Mostrar'}</span>
+              </button>
+            </div>
           </div>
 
-          <div className="box-card-content p-0">
-            {recentTransactions.length === 0 ? (
-              <div className="empty-box-placeholder">
-                <Inbox size={32} strokeWidth={1.5} className="empty-icon" />
-                <p>No hay transacciones registradas aún</p>
+          <div className="balance-amount-display">
+            <div className="balance-main-row">
+              <div className="balance-number-box">
+                <span className="balance-number-label">SALDO DISPONIBLE EN CUENTA</span>
+                {showBalance ? (
+                  <h1 className="balance-big-number">
+                    ₡{accountBalance.toLocaleString('es-CR', { minimumFractionDigits: 2 })}
+                  </h1>
+                ) : (
+                  <h1 className="balance-big-number">••••••••••</h1>
+                )}
+              </div>
+
+              {/* Botones de Recarga */}
+              <div className="balance-action-buttons-group">
                 <button
                   type="button"
-                  className="btn-primary-inline"
-                  onClick={onOpenCommandTerminal}
+                  className="btn-recharge-balance"
+                  onClick={() => setShowRechargeModal(true)}
+                  title="Ingresar fondos a la cuenta"
                 >
-                  <Plus size={14} />
-                  <span>Registrar primer pago</span>
+                  <Plus size={16} strokeWidth={2.5} />
+                  <span>Recargar Saldo</span>
                 </button>
+
+                {onResetBalance && (
+                  <button
+                    type="button"
+                    className="btn-reset-balance"
+                    onClick={() => onResetBalance(150000)}
+                    title="Restablecer saldo a ₡150,000"
+                  >
+                    <RotateCcw size={14} />
+                    <span>Reiniciar Saldo</span>
+                  </button>
+                )}
               </div>
-            ) : (
-              <table className="recent-activity-table">
-                <thead>
-                  <tr>
-                    <th>ID Transacción</th>
-                    <th>Cliente</th>
-                    <th>Monto</th>
-                    <th>Estado</th>
-                    <th>Acción</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {recentTransactions.map((tx) => (
-                    <tr key={tx.transactionId}>
-                      <td className="mono-code">
-                        <span title={tx.transactionId}>
-                          {tx.transactionId.substring(0, 14)}...
-                        </span>
-                      </td>
-                      <td>{tx.customerId}</td>
-                      <td className="amount-cell">
-                        {tx.amount.toLocaleString('es-CR')} {tx.currency}
-                      </td>
-                      <td>
-                        <span className={`status-pill status-${tx.status}`}>
-                          {tx.status}
-                        </span>
-                      </td>
-                      <td>
-                        <button
-                          type="button"
-                          className="btn-table-drill"
-                          onClick={() => onSelectTransaction(tx.transactionId)}
-                        >
-                          <span>Ver Historia</span>
-                          <ArrowRight size={13} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            </div>
+
+            {/* Chips de Recarga Rápida */}
+            <div className="quick-recharge-presets-row">
+              <span className="quick-recharge-label">Recarga Inmediata (+):</span>
+              <button
+                type="button"
+                className="btn-quick-chip"
+                onClick={() => handleQuickAdd(25000)}
+                title="Acreditar ₡25,000"
+              >
+                +₡25k
+              </button>
+              <button
+                type="button"
+                className="btn-quick-chip"
+                onClick={() => handleQuickAdd(50000)}
+                title="Acreditar ₡50,000"
+              >
+                +₡50k
+              </button>
+              <button
+                type="button"
+                className="btn-quick-chip"
+                onClick={() => handleQuickAdd(100000)}
+                title="Acreditar ₡100,000"
+              >
+                +₡100k
+              </button>
+              <button
+                type="button"
+                className="btn-quick-chip"
+                onClick={() => handleQuickAdd(250000)}
+                title="Acreditar ₡250,000"
+              >
+                +₡250k
+              </button>
+              <button
+                type="button"
+                className="btn-quick-chip highlight"
+                onClick={() => setShowRechargeModal(true)}
+              >
+                Otro Monto...
+              </button>
+            </div>
+
+            {/* Regla de Fondos */}
+            <div className="balance-badges-row">
+              <div className="balance-rule-box">
+                <Lock size={14} className="text-emerald" />
+                <strong>Regla de Cuenta:</strong> Solo podrás transferir o pagar montos dentro del límite de este saldo disponible (₡{accountBalance.toLocaleString('es-CR')}). Pagos superiores se bloquearán automáticamente.
+              </div>
+            </div>
+          </div>
+
+          {/* Secondary stats row: ENTRADAS Y SALIDAS DE DINERO */}
+          <div className="balance-substats-row">
+            <div className="substat-item">
+              <span className="substat-label">
+                <TrendingDown size={14} className="text-rose inline-icon" /> Salidas Totales / Pagos:
+              </span>
+              <strong className="substat-value text-rose font-bold">
+                {showBalance ? `- ₡${totalDebitedCRC.toLocaleString('es-CR', { minimumFractionDigits: 2 })}` : '••••'}
+              </strong>
+            </div>
+
+            <div className="substat-item">
+              <span className="substat-label">
+                <TrendingUp size={14} className="text-emerald inline-icon" /> Ingresos / Recargas:
+              </span>
+              <strong className="substat-value text-emerald font-bold">
+                {showBalance ? `+ ₡${totalRechargedCRC.toLocaleString('es-CR', { minimumFractionDigits: 2 })}` : '••••'}
+              </strong>
+            </div>
+
+            <div className="substat-item">
+              <span className="substat-label">En Tránsito / Por Procesar:</span>
+              <strong className="substat-value text-amber">
+                {showBalance ? `₡${pendingSalesCRC.toLocaleString('es-CR', { minimumFractionDigits: 2 })}` : '••••'}
+              </strong>
+            </div>
+          </div>
+
+          {/* Quick Bank Action Buttons */}
+          <div className="bank-quick-actions-bar">
+            <button type="button" className="bank-action-btn primary" onClick={onOpenCheckout}>
+              <div className="action-icon-circle">
+                <Send size={18} />
+              </div>
+              <span>Enviar Dinero / Pagar</span>
+            </button>
+
+            <button type="button" className="bank-action-btn" onClick={() => setShowRechargeModal(true)}>
+              <div className="action-icon-circle">
+                <Wallet size={18} />
+              </div>
+              <span>Ingresar Fondos</span>
+            </button>
+
+            <button type="button" className="bank-action-btn" onClick={onOpenSimulator}>
+              <div className="action-icon-circle">
+                <Zap size={18} />
+              </div>
+              <span>Simular Red</span>
+            </button>
+
+            {onOpenTransactions && (
+              <button type="button" className="bank-action-btn" onClick={onOpenTransactions}>
+                <div className="action-icon-circle">
+                  <History size={18} />
+                </div>
+                <span>Ver Extracto</span>
+              </button>
             )}
           </div>
         </div>
       </div>
+
+      {/* ======================================================================
+          APARTADO DE MOVIMIENTOS DENTRO DE INICIO Y CUENTAS
+          (Salidas y Entradas reflejadas claramente)
+          ====================================================================== */}
+      <div className="bank-movements-section">
+        <div className="movements-header">
+          <div className="movements-header-info">
+            <div className="movements-title-badge">
+              <Receipt size={18} />
+              <h3>Apartado de Movimientos de la Cuenta</h3>
+            </div>
+            <p>Historial en tiempo real de salidas de dinero, pagos con tarjeta y abonos de fondos</p>
+          </div>
+
+          {/* Filtros de Movimientos */}
+          <div className="movements-filter-toolbar">
+            <div className="movements-filter-tabs">
+              <button
+                type="button"
+                className={`filter-tab-btn ${movementFilter === 'all' ? 'active' : ''}`}
+                onClick={() => setMovementFilter('all')}
+              >
+                Todos ({transactions.length + rechargeHistory.length})
+              </button>
+
+              <button
+                type="button"
+                className={`filter-tab-btn filter-tab-out ${movementFilter === 'transfers' ? 'active' : ''}`}
+                onClick={() => setMovementFilter('transfers')}
+              >
+                🔴 Salidas / Pagos ({transactions.length})
+              </button>
+
+              <button
+                type="button"
+                className={`filter-tab-btn filter-tab-in ${movementFilter === 'recharges' ? 'active' : ''}`}
+                onClick={() => setMovementFilter('recharges')}
+              >
+                🟢 Ingresos / Recargas ({rechargeHistory.length})
+              </button>
+            </div>
+
+            <button type="button" className="btn-new-movement" onClick={onOpenCheckout}>
+              <PlusCircle size={15} />
+              <span>Nueva Transferencia</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Lista de Movimientos Unificada */}
+        {unifiedMovements.length === 0 ? (
+          <div className="empty-movements-card">
+            <CreditCard size={42} />
+            <h4>Aún no hay movimientos registrados en esta cuenta</h4>
+            <p>Realiza tu primera transferencia o recarga tu saldo para comenzar a ver tus movimientos en tiempo real.</p>
+            <div className="empty-actions-row">
+              <button type="button" className="btn-first-movement" onClick={onOpenCheckout}>
+                <Send size={15} />
+                <span>Enviar Primer Pago</span>
+              </button>
+              <button
+                type="button"
+                className="btn-first-recharge"
+                onClick={() => setShowRechargeModal(true)}
+              >
+                <Plus size={15} />
+                <span>Recargar Fondos</span>
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="movements-list-card">
+            {unifiedMovements.map((item) => {
+              const isRecharge = item.type === 'recharge';
+              const st = !isRecharge && item.originalTx ? getStatusInfo(item.status) : null;
+              const isCompleted = item.status === 'COMPLETED';
+              const isApproved = item.status === 'PAYMENT_APPROVED';
+              const isRejected = item.status === 'PAYMENT_REJECTED';
+              const isPending = item.status === 'PAYMENT_PENDING' || item.status === 'CREATED';
+
+              return (
+                <div
+                  key={item.id}
+                  className={`movement-item-row ${
+                    isRecharge ? 'movement-recharge-row' : 'movement-outgoing-row'
+                  }`}
+                  onClick={() => {
+                    if (!isRecharge && onSelectTransaction) {
+                      onSelectTransaction(item.id);
+                    }
+                  }}
+                  title={isRecharge ? 'Abono acreditado' : 'Clic para ver comprobante bancario oficial'}
+                >
+                  {/* Left Icon: Rojo para salida, Verde para entrada */}
+                  <div
+                    className={`movement-icon-bubble ${
+                      isRecharge
+                        ? 'credit'
+                        : isRejected
+                        ? 'rejected'
+                        : 'debit-out'
+                    }`}
+                  >
+                    {isRecharge ? (
+                      <ArrowDownLeft size={18} className="text-emerald" />
+                    ) : isRejected ? (
+                      <AlertTriangle size={18} className="text-rose" />
+                    ) : (
+                      <ArrowUpRight size={18} className="text-rose" />
+                    )}
+                  </div>
+
+                  {/* Middle Info */}
+                  <div className="movement-details-col">
+                    <div className="movement-dest-name">
+                      <strong>{item.title}</strong>
+                      {isRecharge ? (
+                        <span className="bank-status-chip chip-credit">
+                          <CheckCircle2 size={12} />
+                          <span>INGRESO ACREDITADO</span>
+                        </span>
+                      ) : isRejected ? (
+                        <span className="bank-status-chip chip-rejected">
+                          <AlertTriangle size={12} />
+                          <span>PAGO RECHAZADO (FONDOS DEVUELTOS)</span>
+                        </span>
+                      ) : (
+                        <span className="bank-status-chip chip-outgoing">
+                          <ArrowUpRight size={12} />
+                          <span>SALIDA DE DINERO · {st?.bankStatus || st?.label}</span>
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="movement-subtext">
+                      <span>{item.subtitle}</span>
+                      <span className="movement-date-dot">•</span>
+                      <span>{formatDateTime(item.rawDate)}</span>
+                      {item.approvalCode && (
+                        <span className="auth-code-pill">Aut: {item.approvalCode}</span>
+                      )}
+                      {item.rejectionReason && (
+                        <span className="rejected-reason-pill">{item.rejectionReason}</span>
+                      )}
+                      {!isRecharge && item.currency !== 'CRC' && (
+                        <span className="balance-after-pill">
+                          Debitado: ₡{item.amountCRC.toLocaleString('es-CR')} CRC
+                        </span>
+                      )}
+                      {isRecharge && item.balanceAfter !== undefined && (
+                        <span className="balance-after-pill">
+                          Saldo: ₡{item.balanceAfter.toLocaleString('es-CR')}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Right Amount & Voucher action */}
+                  <div className="movement-amount-col">
+                    <strong
+                      className={`movement-amount ${
+                        isRecharge
+                          ? 'text-credit-amount'
+                          : isRejected
+                          ? 'text-rejected'
+                          : 'text-debit-amount font-bold'
+                      }`}
+                    >
+                      {isRecharge ? '+' : '-'}
+                      {formatMoney(item.amount, item.currency)}
+                    </strong>
+
+                    {!isRecharge ? (
+                      <button type="button" className="btn-view-voucher">
+                        <span>Ver Comprobante</span>
+                        <ChevronRight size={14} />
+                      </button>
+                    ) : (
+                      <span className="recharge-badge-check">
+                        <CheckCircle2 size={13} />
+                        <span>Acreditado</span>
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Security Guarantee Banner */}
+      <div className="bank-security-bar">
+        <div className="security-icon-badge">
+          <Lock size={16} />
+        </div>
+        <div className="security-text">
+          <strong>Transacciones Bancarias Seguras:</strong> Todos tus pagos y recargas cuentan con verificación de saldo en tiempo real, protección de fondos y emisión de comprobantes digitales válidos.
+        </div>
+      </div>
+
+      {/* ======================================================================
+          MODAL DE RECARGA MANUAL DE DINERO
+          ====================================================================== */}
+      {showRechargeModal && (
+        <div className="modal-backdrop" onClick={() => setShowRechargeModal(false)}>
+          <div className="modal-recharge-card" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="modal-header-left">
+                <div className="modal-icon-bubble">
+                  <Wallet size={20} />
+                </div>
+                <div>
+                  <h3>Ingresar Fondos a la Cuenta</h3>
+                  <span>Aumenta tu saldo disponible para realizar pagos y transferencias</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="btn-modal-close"
+                onClick={() => setShowRechargeModal(false)}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleConfirmRecharge} className="modal-form">
+              {/* Current balance indicator */}
+              <div className="modal-current-balance">
+                <span>Saldo disponible actual:</span>
+                <strong>₡{accountBalance.toLocaleString('es-CR', { minimumFractionDigits: 2 })}</strong>
+              </div>
+
+              {/* Quick Preset Buttons */}
+              <div className="form-group">
+                <label className="form-label">Selecciona un monto rápido:</label>
+                <div className="recharge-presets-grid">
+                  {[10000, 25000, 50000, 100000, 250000, 500000].map((amt) => (
+                    <button
+                      key={amt}
+                      type="button"
+                      className={`btn-recharge-preset ${rechargeAmount === amt.toString() ? 'active' : ''}`}
+                      onClick={() => handleApplyPreset(amt)}
+                    >
+                      + ₡{amt.toLocaleString('es-CR')}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Custom Amount */}
+              <div className="form-group">
+                <label className="form-label">Monto a Recargar (₡ CRC):</label>
+                <input
+                  type="number"
+                  min="1"
+                  step="any"
+                  className="bank-input input-recharge-big"
+                  value={rechargeAmount}
+                  onChange={(e) => setRechargeAmount(e.target.value)}
+                  placeholder="50000"
+                  required
+                />
+              </div>
+
+              {/* Method */}
+              <div className="form-group">
+                <label className="form-label">Método de Recarga:</label>
+                <select
+                  className="bank-input bank-select"
+                  value={rechargeMethod}
+                  onChange={(e) => setRechargeMethod(e.target.value)}
+                >
+                  <option value="SINPE Móvil">📱 SINPE Móvil Inmediato</option>
+                  <option value="Transferencia Externa">🏦 Transferencia Interbancaria (IBAN)</option>
+                  <option value="Tarjeta de Débito Externa">💳 Tarjeta Externa (Visa / Mastercard)</option>
+                  <option value="Depósito en Cajero ATM">💵 Depósito en Efectivo / ATM</option>
+                </select>
+              </div>
+
+              {/* Note */}
+              <div className="form-group">
+                <label className="form-label">Referencia / Detalle:</label>
+                <input
+                  type="text"
+                  className="bank-input"
+                  value={rechargeNote}
+                  onChange={(e) => setRechargeNote(e.target.value)}
+                  placeholder="Ej: Depósito de nómina o ingreso de fondos"
+                />
+              </div>
+
+              <div className="modal-actions-row">
+                <button
+                  type="button"
+                  className="btn-modal-cancel"
+                  onClick={() => setShowRechargeModal(false)}
+                >
+                  Cancelar
+                </button>
+
+                <button type="submit" className="btn-modal-confirm">
+                  <CheckCircle2 size={16} />
+                  <span>Acreditar +₡{Number(rechargeAmount || 0).toLocaleString('es-CR')} Ahora</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

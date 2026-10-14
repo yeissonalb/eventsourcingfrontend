@@ -1,5 +1,13 @@
 import React from 'react';
-import { Search, X, RefreshCw, Plus } from 'lucide-react';
+import {
+  Search,
+  X,
+  RefreshCw,
+  Send,
+  Code2,
+  Building2,
+  Lock,
+} from 'lucide-react';
 
 export default function Header({
   currentView,
@@ -8,33 +16,35 @@ export default function Header({
   onOpenNewTransaction,
   searchQuery,
   setSearchQuery,
+  isTechnicalMode,
+  setIsTechnicalMode,
 }) {
   const viewTitles = {
     overview: {
-      title: 'Panel General',
-      subtitle: 'Resumen de transacciones y demostración del patrón Event Sourcing',
+      title: 'Banca Digital & Cuentas',
+      subtitle: 'Resumen de saldo disponible, tarjeta platinum y movimientos en tiempo real',
+    },
+    checkout: {
+      title: 'Transferir o Pagar con Tarjeta',
+      subtitle: 'Envío de dinero y pasarela bancaria inmediata con verificación de fondos',
     },
     transactions: {
-      title: 'Historial de Pagos',
-      subtitle: 'Consulta el listado completo y el estado actual de cada operación',
+      title: 'Extracto de Movimientos',
+      subtitle: 'Historial detallado de débitos, créditos y comprobantes bancarios',
     },
-    commands: {
-      title: 'Procesar un Pago',
-      subtitle: 'Generación controlada de los 6 eventos del ciclo de vida',
+    timeline: {
+      title: 'Rastreo de Transferencias',
+      subtitle: 'Trazabilidad y compensación interbancaria paso a paso',
     },
-    eventstore: {
-      title: 'Auditoría y Eventos',
-      subtitle: 'Secuencia de eventos inmutables y reconstrucción en vivo con replay',
-    },
-    system: {
-      title: 'Simulador para Exposición',
-      subtitle: 'Ejecuta en un solo clic el flujo de 6 eventos para la defensa del proyecto',
+    simulator: {
+      title: 'Simulador de Red Bancaria',
+      subtitle: 'Comprobación de pagos aprobados, rechazos de fondos y compensación',
     },
   };
 
   const currentMeta = viewTitles[currentView] || {
-    title: 'Auditoría de Transacciones',
-    subtitle: 'Demostración de Event Sourcing',
+    title: 'PayBank Digital',
+    subtitle: 'Banca Digital & Pagos Seguros en Tiempo Real',
   };
 
   return (
@@ -45,39 +55,23 @@ export default function Header({
       </div>
 
       <div className="header-right">
-        {/* Global Search Input */}
-        <div className="header-search-box">
-          <Search size={15} className="search-icon" />
-          <input
-            type="text"
-            placeholder="Buscar por ID, cliente, monto..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="header-search-input"
-          />
-          {searchQuery && (
-            <button
-              type="button"
-              className="btn-clear-search"
-              onClick={() => setSearchQuery('')}
-              title="Limpiar búsqueda"
-            >
-              <X size={14} />
-            </button>
-          )}
+        {/* Bank Security Status Badge */}
+        <div className="bank-security-status-badge">
+          <Lock size={13} />
+          <span>Conexión Segura 256-bit</span>
         </div>
 
-        {/* Actions */}
+        {/* Action Buttons */}
         <div className="header-actions">
           <button
             type="button"
             className="btn-header-refresh"
             onClick={onRefresh}
             disabled={isRefreshing}
-            title="Actualizar datos"
+            title="Actualizar saldo y movimientos"
           >
             <RefreshCw size={14} className={isRefreshing ? 'icon-spin' : ''} />
-            <span>{isRefreshing ? 'Cargando...' : 'Actualizar'}</span>
+            <span>{isRefreshing ? 'Actualizando...' : 'Actualizar'}</span>
           </button>
 
           <button
@@ -85,8 +79,8 @@ export default function Header({
             className="btn-header-create"
             onClick={onOpenNewTransaction}
           >
-            <Plus size={15} strokeWidth={2.5} />
-            <span>Nuevo Pago</span>
+            <Send size={15} strokeWidth={2.2} />
+            <span>Enviar Dinero</span>
           </button>
         </div>
       </div>

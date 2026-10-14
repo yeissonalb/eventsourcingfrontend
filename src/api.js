@@ -1,7 +1,5 @@
 // Advanced API Client for Command Service and History Service
 
-import { logs, SeverityNumber } from '@opentelemetry/api-logs';
-
 const cleanUrl = (url, fallback) => {
   const target = url || fallback;
   return target.trim().replace(/\/+$/, '');
@@ -77,7 +75,13 @@ export async function createTransaction({ transactionId, amount, currency, custo
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
-  return handleResponse(res);
+  const data = await handleResponse(res);
+  const resolvedTxId =
+    data.transactionId ||
+    data.state?.transactionId ||
+    data.event?.transactionId ||
+    payload.transactionId;
+  return { ...data, transactionId: resolvedTxId };
 }
 
 export async function requestPayment(id, { paymentId, amount, expectedVersion }) {
@@ -144,10 +148,16 @@ export async function completeTransaction(id, { completedAt, expectedVersion }) 
   return handleResponse(res);
 }
 
-// History API Operations (Port 3001)
+// History API Operations (Port 3001) with resilient fallback to Command API (Port 3000)
 export async function getHistoryTransactions() {
-  const res = await fetch(`${HISTORY_API_BASE}/history/transactions`);
-  return handleResponse(res);
+  try {
+    const res = await fetch(`${HISTORY_API_BASE}/history/transactions`);
+    return await handleResponse(res);
+  } catch (err) {
+    // Fallback directly to Command API if History API port 3001 is offline
+    const res = await fetch(`${COMMAND_API_BASE}/transactions`);
+    return handleResponse(res);
+  }
 }
 
 export async function getTransactionHistoryEvents(id) {
@@ -156,6 +166,11 @@ export async function getTransactionHistoryEvents(id) {
 }
 
 export async function getTransactionHistoryState(id) {
-  const res = await fetch(`${HISTORY_API_BASE}/history/transactions/${encodeURIComponent(id)}`);
-  return handleResponse(res);
+  try {
+    const res = await fetch(`${HISTORY_API_BASE}/history/transactions/${encodeURIComponent(id)}`);
+    return await handleResponse(res);
+  } catch (err) {
+    const res = await fetch(`${COMMAND_API_BASE}/transactions/${encodeURIComponent(id)}`);
+    return handleResponse(res);
+  }
 }
