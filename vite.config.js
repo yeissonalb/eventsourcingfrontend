@@ -23,15 +23,33 @@ export function createOtlpProxy(env) {
   }
 }
 
+function prefixProxy(prefix, target) {
+  return {
+    target,
+    changeOrigin: true,
+    rewrite: (path) => path.slice(prefix.length) || '/',
+  }
+}
+
+export function createApiProxies(env) {
+  const proxies = {}
+  const commandTarget = env.API_PROXY_TARGET?.trim()
+  const historyTarget = env.HISTORY_PROXY_TARGET?.trim()
+  if (commandTarget) proxies['/command-api'] = prefixProxy('/command-api', commandTarget)
+  if (historyTarget) proxies['/history-api'] = prefixProxy('/history-api', historyTarget)
+  return proxies
+}
+
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const otlpProxy = createOtlpProxy(env)
-  const proxy = otlpProxy ? { '/otlp': otlpProxy } : undefined
+  const routes = { ...createApiProxies(env), ...(otlpProxy ? { '/otlp': otlpProxy } : {}) }
+  const proxy = Object.keys(routes).length > 0 ? routes : undefined
 
   return {
     plugins: [react()],
     server: { proxy },
-    preview: { proxy },
+    preview: { proxy, allowedHosts: true },
   }
 })
